@@ -8,6 +8,7 @@ import Redis from "ioredis";
  * =========================================================================
  */
 
+const redisUri = process.env.REDIS_URI || "redis://127.0.0.1:6379";
 const isTest = process.env.NODE_ENV === "test";
 
 export const redis = isTest
