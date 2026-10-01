@@ -21,6 +21,7 @@ import Dashboard from './pages/Dashboard';
 import Notifications from './pages/Notifications';
 import You from './pages/You';
 import Settings from './pages/Settings';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -55,7 +56,7 @@ function App() {
             <Route path="studio" element={<Dashboard />} />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
-            <Route path="*" element={<Home />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </Router>
