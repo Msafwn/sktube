@@ -37,6 +37,12 @@ jobs:
           node -c src/controllers/User.controller.js
           echo "All backend syntax checks passed!"
 
+      - name: Run Automated API Tests
+        run: |
+          echo "Running API integration tests..."
+          npm test
+          echo "All API integration tests passed successfully!"
+
   frontend_ci:
     name: Frontend Build & Integrity Checks
     runs-on: ubuntu-latest

@@ -3,6 +3,9 @@ import { RedisStore } from "rate-limit-redis";
 import { redis } from "../utils/redis.js";
 
 const createStore = (prefix) => {
+    if (process.env.NODE_ENV === "test") {
+        return undefined; // Use in-memory store during automated tests
+    }
     return new RedisStore({
         sendCommand: (...args) => redis.call(...args),
         prefix: `rl:slow:${prefix}:`

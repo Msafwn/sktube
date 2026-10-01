@@ -7,6 +7,9 @@ import { ApiError } from "../utils/ApiError.js";
  * Helper: Create Redis Store instance for Rate Limiting
  */
 const createStore = (prefix) => {
+    if (process.env.NODE_ENV === "test") {
+        return undefined; // Use in-memory store during automated tests
+    }
     return new RedisStore({
         sendCommand: (...args) => redis.call(...args),
         prefix: `rl:${prefix}:`

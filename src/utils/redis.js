@@ -8,38 +8,52 @@ import Redis from "ioredis";
  * =========================================================================
  */
 
-const redisUri = process.env.REDIS_URI || "redis://127.0.0.1:6379";
+const isTest = process.env.NODE_ENV === "test";
 
-export const redis = new Redis(redisUri, {
-    maxRetriesPerRequest: 2,
-    enableReadyCheck: true,
-    retryStrategy(times) {
-        // Exponential backoff capped at 3 seconds
-        const delay = Math.min(times * 150, 3000);
-        return delay;
+export const redis = isTest
+    ? {
+        call: async () => null,
+        get: async () => null,
+        set: async () => "OK",
+        del: async () => 1,
+        disconnect: () => {},
+        status: "close",
+        on: () => {},
+        scanStream: () => ({ on: () => {} }),
+        pipeline: () => ({ del: () => {}, exec: async () => [] })
     }
-});
+    : new Redis(redisUri, {
+        maxRetriesPerRequest: 2,
+        enableReadyCheck: true,
+        retryStrategy(times) {
+            // Exponential backoff capped at 3 seconds
+            const delay = Math.min(times * 150, 3000);
+            return delay;
+        }
+    });
 
 let isRedisConnected = false;
 
-redis.on("connect", () => {
-    isRedisConnected = true;
-    console.log("⚡ [Redis]: Connected to Redis Server successfully.");
-});
+if (!isTest) {
+    redis.on("connect", () => {
+        isRedisConnected = true;
+        console.log("⚡ [Redis]: Connected to Redis Server successfully.");
+    });
 
-redis.on("ready", () => {
-    isRedisConnected = true;
-    console.log("⚡ [Redis]: Ready to accept commands.");
-});
+    redis.on("ready", () => {
+        isRedisConnected = true;
+        console.log("⚡ [Redis]: Ready to accept commands.");
+    });
 
-redis.on("error", (err) => {
-    isRedisConnected = false;
-    console.warn("⚠️ [Redis]: Connection warning (falling back to database):", err.message || err);
-});
+    redis.on("error", (err) => {
+        isRedisConnected = false;
+        console.warn("⚠️ [Redis]: Connection warning (falling back to database):", err.message || err);
+    });
 
-redis.on("close", () => {
-    isRedisConnected = false;
-});
+    redis.on("close", () => {
+        isRedisConnected = false;
+    });
+}
 
 /**
  * Middleware: redisCache(durationSeconds)
