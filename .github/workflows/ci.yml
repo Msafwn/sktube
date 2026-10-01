@@ -1,46 +1,44 @@
-name: SKTUBE Automated CI Pipeline
+name: SKTUBE CI Pipeline
 
-# Trigger on push or pull request to any branch
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "**" ]
+    branches: [ "main", "master" ]
 
 jobs:
   code_quality_and_build:
-    name: 🧪 Quality Checks & Syntax Validation
+    name: Quality Checks and Syntax Validation
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Step 1: Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🟢 Step 2: Setup Node.js 20 Environment
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: 📦 Step 3: Install Backend Dependencies
+      - name: Install Dependencies
         run: |
           echo "Installing dependencies..."
           npm install
 
-      - name: 🔍 Step 4: Verify JavaScript Syntax & Integrity
+      - name: Verify JavaScript Syntax
         run: |
-          echo "Running Node.js syntax checks on core server files..."
+          echo "Running syntax checks on core server files..."
           node -c src/index.js
           node -c src/app.js
           node -c src/utils/redis.js
           node -c src/socket/index.js
           node -c src/controllers/video.controller.js
           node -c src/controllers/User.controller.js
-          echo "✅ All syntax checks passed with 0 errors!"
+          echo "All syntax checks passed with 0 errors!"
 
-      - name: 🎉 Step 5: Success Announcement
+      - name: Report Status
         run: |
           echo "=================================================="
-          echo "🚀 CI PIPELINE PASSED: Code is clean and healthy!"
-          echo "Ready for Continuous Deployment (CD)."
+          echo "CI PIPELINE PASSED: All server files are syntax clean!"
           echo "=================================================="
