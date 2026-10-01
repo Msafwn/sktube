@@ -9,7 +9,7 @@ import {
 } from "../controllers/video.controller.js";
 import { verifyJWT, verifyOptionalJWT } from "../Middlewares/auth.middleware.js";
 import { upload } from "../Middlewares/multer.middlewares.js";
-import { uploadLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { uploadLimiter } from "../Middlewares/rateLimiter.middleware.js";
 import { redisCache } from "../utils/redis.js";
 
 const router = Router();

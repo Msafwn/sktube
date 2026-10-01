@@ -4,9 +4,9 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
 import { ApiError } from "./utils/ApiError.js";
-import { generalLimiter } from "./middlewares/rateLimiter.middleware.js";
-import { speedThrottler } from "./middlewares/throttler.middleware.js";
-import { securitySanitizer } from "./middlewares/sanitize.middleware.js";
+import { generalLimiter } from "./Middlewares/rateLimiter.middleware.js";
+import { speedThrottler } from "./Middlewares/throttler.middleware.js";
+import { securitySanitizer } from "./Middlewares/sanitize.middleware.js";
 
 const app = express();
 

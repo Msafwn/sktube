@@ -16,7 +16,7 @@ import {
 } from "../controllers/User.controller.js";
 import { upload } from "../Middlewares/multer.middlewares.js";
 import { verifyJWT, verifyOptionalJWT } from "../Middlewares/auth.middleware.js";
-import { authLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { authLimiter } from "../Middlewares/rateLimiter.middleware.js";
 
 const router = Router();
 
