@@ -1,0 +1,60 @@
+services:
+  # ==========================================
+  # 1. Backend Node Instance 1 (Worker 1)
+  # ==========================================
+  backend-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sktube-backend-1
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SERVER_INSTANCE_ID=Worker-1
+    volumes:
+      - ./src:/usr/src/app/src
+    networks:
+      - sktube-network
+
+  # ==========================================
+  # 2. Backend Node Instance 2 (Worker 2)
+  # ==========================================
+  backend-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sktube-backend-2
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SERVER_INSTANCE_ID=Worker-2
+    volumes:
+      - ./src:/usr/src/app/src
+    networks:
+      - sktube-network
+
+  # ==========================================
+  # 3. Frontend & NGINX Load Balancer
+  # ==========================================
+  frontend:
+    build:
+      context: ./Front-end
+      dockerfile: Dockerfile
+    container_name: sktube-frontend-loadbalancer
+    restart: unless-stopped
+    ports:
+      - "3000:80"  # Browser mein http://localhost:3000
+    depends_on:
+      - backend-1
+      - backend-2
+    networks:
+      - sktube-network
+
+# ==========================================
+# Private Network: Load Balancer aur Workers ke liye
+# ==========================================
+networks:
+  sktube-network:
+    driver: bridge

@@ -1,0 +1,19 @@
+{
+  "watch": ["src"],
+  "ext": "js,mjs,cjs,json",
+  "ignore": [
+    "Public/*",
+    "Public/temp/*",
+    "public/*",
+    "public/temp/*",
+    "node_modules/*",
+    "*.mp4",
+    "*.mkv",
+    "*.mov",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.webp"
+  ],
+  "exec": "node src/index.js"
+}
