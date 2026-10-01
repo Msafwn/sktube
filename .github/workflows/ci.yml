@@ -7,8 +7,8 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  code_quality_and_build:
-    name: Quality Checks and Syntax Validation
+  backend_ci:
+    name: Backend Syntax & Quality Checks
     runs-on: ubuntu-latest
 
     steps:
@@ -21,9 +21,9 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
         run: |
-          echo "Installing dependencies..."
+          echo "Installing backend dependencies..."
           npm install
 
       - name: Verify JavaScript Syntax
@@ -35,10 +35,32 @@ jobs:
           node -c src/socket/index.js
           node -c src/controllers/video.controller.js
           node -c src/controllers/User.controller.js
-          echo "All syntax checks passed with 0 errors!"
+          echo "All backend syntax checks passed!"
 
-      - name: Report Status
+  frontend_ci:
+    name: Frontend Build & Integrity Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: Front-end/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./Front-end
         run: |
-          echo "=================================================="
-          echo "CI PIPELINE PASSED: All server files are syntax clean!"
-          echo "=================================================="
+          echo "Installing frontend dependencies..."
+          npm install
+
+      - name: Build Frontend Bundle (Vite)
+        working-directory: ./Front-end
+        run: |
+          echo "Building production frontend bundle..."
+          npm run build
+          echo "Frontend build successfully generated with 0 errors!"
