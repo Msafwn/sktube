@@ -60,8 +60,7 @@ const userSchema = new Schema(
     }
 );
 
-// Performance & Query Optimization Indexes
-userSchema.index({ email: 1 });
+// Performance & Query Optimization Indexes (email is already indexed via unique: true)
 userSchema.index({ createdAt: -1 });
 
 /**
