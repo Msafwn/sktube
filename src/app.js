@@ -13,13 +13,29 @@ const app = express();
 // Enable trust proxy for NGINX reverse proxy & accurate client IP in rate limiters
 app.set("trust proxy", 1);
 
+// Force HTTPS redirection in production environments (Strict 301 Permanent Redirect)
+app.use((req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+        const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
+        if (!isSecure) {
+            return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+        }
+    }
+    next();
+});
+
 // ==========================================
 // 1. ENTERPRISE SECURITY & HEADERS (Helmet)
 // ==========================================
-// Apply Helmet for 15+ Secure HTTP Response Headers & hide Express signature
+// Apply Helmet for 15+ Secure HTTP Response Headers, HSTS enforcement & hide Express signature
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: false // Disabled for Cloudinary video streaming & Socket.IO WebSockets
+    contentSecurityPolicy: false, // Disabled for Cloudinary video streaming & Socket.IO WebSockets
+    hsts: {
+        maxAge: 31536000, // 1 Year in seconds (Forces browser to strictly use HTTPS)
+        includeSubDomains: true,
+        preload: true
+    }
 }));
 
 // CORS Configuration (Allow Web, Mobile App & Local Network IPs)
