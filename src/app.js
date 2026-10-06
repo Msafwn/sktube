@@ -60,6 +60,25 @@ app.use(express.static("Public"));
 app.use(cookieParser(process.env.COOKIE_SECRET || process.env.ACCESS_TOKEN_SECRET));
 
 // ==========================================
+// 3. CSRF DEFENSE-IN-DEPTH (OWASP Standard)
+// ==========================================
+// Protects state-changing requests (POST, PUT, DELETE, PATCH) against cross-site exploitation
+app.use((req, res, next) => {
+    // Read-only requests are safe from CSRF
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+        return next();
+    }
+
+    // Modern browsers automatically send `Sec-Fetch-Site` header (Unforgeable by JavaScript)
+    const secFetchSite = req.headers["sec-fetch-site"];
+    if (secFetchSite === "cross-site") {
+        return next(new ApiError(403, "Cross-Site Request Forgery (CSRF) blocked: Request originated from an untrusted external site."));
+    }
+
+    next();
+});
+
+// ==========================================
 // 3. DATA SANITIZATION & RATE LIMITING
 // ==========================================
 // Unified Express 5 Sanitizer: NoSQL Injection + XSS + Parameter Pollution (HPP)

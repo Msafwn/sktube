@@ -115,4 +115,26 @@ describe("SKTUBE Backend API Tests", () => {
             assert.match(res.body.message, /password/i);
         });
     });
+
+    describe("5. CSRF Protection Middleware", () => {
+        it("should reject cross-site state mutation requests with 403 Forbidden", async () => {
+            const res = await request(app)
+                .post("/api/v1/users/login")
+                .set("Sec-Fetch-Site", "cross-site")
+                .send({ email: "test@example.com", password: "password123" });
+
+            assert.strictEqual(res.status, 403);
+            assert.strictEqual(res.body.success, false);
+            assert.match(res.body.message, /CSRF/i);
+        });
+
+        it("should allow safe read-only GET requests from any site", async () => {
+            const res = await request(app)
+                .get("/api/v1/healthcheck")
+                .set("Sec-Fetch-Site", "cross-site");
+
+            assert.strictEqual(res.status, 200);
+            assert.strictEqual(res.body.success, true);
+        });
+    });
 });
