@@ -41,7 +41,15 @@ const userSchema = new Schema(
         ],
         password: {
             type: String,
-            required: [true, 'Password is required']
+            required: function () {
+                return !this.googleId;
+            }
+        },
+        googleId: {
+            type: String,
+            unique: true,
+            sparse: true,
+            index: true
         },
         refreshToken: {
             type: String
@@ -69,16 +77,16 @@ userSchema.index({ createdAt: -1 });
  * Agar password modify nahi hua to dobara hash nahi karega
  */
 userSchema.pre("save", async function () {
-    if (!this.isModified("password")) return
+    if (!this.isModified("password") || !this.password) return;
 
     this.password = await bcrypt.hash(this.password, 10);
-   
 });
 
 /**
  * Custom Method: User ka entered plain password aur database ka hashed password compare karein
  */
 userSchema.methods.isPasswordCorrect = async function (password) {
+    if (!this.password) return false;
     return await bcrypt.compare(password, this.password);
 };
 

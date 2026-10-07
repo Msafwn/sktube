@@ -26,6 +26,10 @@ import jwt from "jsonwebtoken";
 // Node.js local file system module
 import fs from "fs";
 
+// Google OAuth 2.0 Client
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 /**
  * Helper: Agar controller validation fail ho jaye to Multer ki upload ki hui local temporary files delete karna
  */
@@ -813,6 +817,111 @@ const removeVideoFromWatchHistory = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "Video removed from watch history successfully"));
 });
 
+/**
+ * =========================================================================
+ * Controller: Google OAuth 2.0 Login / Registration
+ * Kaam: Google credential verify karna, existing user find karna ya naya banana, aur JWT tokens issue karna
+ * Method: POST | Route: /api/v1/users/google-login
+ * =========================================================================
+ */
+const googleLogin = asyncHandler(async (req, res) => {
+    const { credential, idToken } = req.body || {};
+    const token = credential || idToken;
+
+    if (!token) {
+        throw new ApiError(400, "Google credential token is required");
+    }
+
+    let payload;
+    try {
+        const ticket = await googleClient.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID
+        });
+        payload = ticket.getPayload();
+    } catch (error) {
+        throw new ApiError(401, "Google token verification failed: " + (error?.message || "Invalid Token"));
+    }
+
+    if (!payload || !payload.email) {
+        throw new ApiError(400, "Invalid Google token payload");
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+
+    // 1. Check if user exists by googleId or email
+    let user = await User.findOne({
+        $or: [{ googleId }, { email: email.toLowerCase().trim() }]
+    });
+
+    if (user) {
+        // Agar user pehle normal email se bana tha aur googleId link nahi tha, to link karein
+        if (!user.googleId) {
+            user.googleId = googleId;
+            if (!user.avatar) user.avatar = picture;
+            await user.save({ validateBeforeSave: false });
+        }
+    } else {
+        // Naya User create karein (Unique username generate karein)
+        const baseUsername = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
+        let uniqueUsername = baseUsername;
+        let counter = 1;
+        while (await User.findOne({ username: uniqueUsername })) {
+            uniqueUsername = `${baseUsername}${Math.floor(100 + Math.random() * 900)}${counter}`;
+            counter++;
+        }
+
+        user = await User.create({
+            username: uniqueUsername,
+            fullName: name || "Google User",
+            email: email.toLowerCase().trim(),
+            avatar: picture || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
+            coverImage: "",
+            googleId
+        });
+    }
+
+    // 2. Access aur Refresh Token generate karein
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
+
+    // 3. User object se sensitive fields exclude karein
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
+    // 4. Secure Cookies configure karein
+    const baseCookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        path: "/"
+    };
+
+    const accessTokenOptions = {
+        ...baseCookieOptions,
+        maxAge: 24 * 60 * 60 * 1000 // 1 Day
+    };
+
+    const refreshTokenOptions = {
+        ...baseCookieOptions,
+        maxAge: 10 * 24 * 60 * 60 * 1000 // 10 Days
+    };
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, accessTokenOptions)
+        .cookie("refreshToken", refreshToken, refreshTokenOptions)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    user: loggedInUser,
+                    accessToken,
+                    refreshToken
+                },
+                "Google login successful"
+            )
+        );
+});
+
 // Controllers export kiye
 export {
     registerUser,
@@ -827,5 +936,6 @@ export {
     getUserChannelProfile,
     getWatchHistory,
     clearWatchHistory,
-    removeVideoFromWatchHistory
+    removeVideoFromWatchHistory,
+    googleLogin
 };

@@ -17,6 +17,12 @@ export const authService = {
     return response.data;
   },
 
+  // Google OAuth Login
+  async googleLogin(credential) {
+    const response = await api.post('/users/google-login', { credential });
+    return response.data;
+  },
+
   // Logout current user (clears backend cookie)
   async logout() {
     const response = await api.post('/users/logout');

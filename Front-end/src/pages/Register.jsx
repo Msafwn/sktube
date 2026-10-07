@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { GoogleLogin } from '@react-oauth/google';
 import { 
   Flame, 
   User, 
@@ -28,6 +30,7 @@ import { RegisterHeader, RegisterChannelPreview, RegisterBenefits } from '../com
 // MAIN COMPOUND ROOT COMPONENT: Register
 // ==========================================
 const Register = () => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -182,6 +185,32 @@ const Register = () => {
       setLoading(false);
     }
   }, [formData, avatar, coverImage, navigate]);
+
+  const handleGoogleSuccess = useCallback(async (credentialResponse) => {
+    try {
+      setLoading(true);
+      setGeneralError(null);
+      const res = await authService.googleLogin(credentialResponse.credential);
+      if (res?.data?.user) {
+        login(res.data.user);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Google registration/login failed. Please try again.';
+      setGeneralError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  }, [login, navigate]);
+
+  const handleGoogleError = useCallback(() => {
+    setGeneralError('Google sign in was unsuccessful. Please try again.');
+  }, []);
 
   return (
     <div className="w-full relative container-4k min-h-[calc(100vh-5rem)]">
@@ -416,6 +445,23 @@ const Register = () => {
               )}
             </button>
           </form>
+
+          {/* Google OAuth Login / Register */}
+          <div className="flex items-center gap-2 my-2">
+            <div className="h-px bg-white/10 flex-1"></div>
+            <span className="text-[9px] text-neutral-400 font-semibold uppercase tracking-wider">or join with</span>
+            <div className="h-px bg-white/10 flex-1"></div>
+          </div>
+          <div className="flex justify-center w-full my-0.5">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              theme="filled_black"
+              shape="pill"
+              size="medium"
+              text="signup_with"
+            />
+          </div>
 
           <div className="mt-1.5 pt-1.5 border-t border-white/10 text-center">
             <p className="text-[10px] text-neutral-400">
@@ -682,6 +728,23 @@ const Register = () => {
                     </>
                   )}
                 </button>
+
+                {/* Google OAuth Login / Register */}
+                <div className="flex items-center gap-3 my-1">
+                  <div className="h-px bg-white/10 flex-1"></div>
+                  <span className="text-[11px] text-neutral-400 font-semibold uppercase tracking-wider">or sign up with</span>
+                  <div className="h-px bg-white/10 flex-1"></div>
+                </div>
+                <div className="flex justify-center w-full my-1">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_black"
+                    shape="pill"
+                    size="large"
+                    text="signup_with"
+                  />
+                </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-neutral-400">
                   <span>

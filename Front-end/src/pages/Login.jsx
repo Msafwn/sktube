@@ -20,8 +20,8 @@ import {
   X
 } from 'lucide-react';
 import authService from '../services/authService';
-
 import { LoginHeader, LoginStudioPreview } from '../components/auth';
+import { GoogleLogin } from '@react-oauth/google';
 
 // ==========================================
 // MAIN COMPOUND ROOT COMPONENT: Login
@@ -133,6 +133,32 @@ const Login = () => {
       setLoading(false);
     }
   }, [formData, login, navigate]);
+
+  const handleGoogleSuccess = useCallback(async (credentialResponse) => {
+    try {
+      setLoading(true);
+      setGeneralError(null);
+      const res = await authService.googleLogin(credentialResponse.credential);
+      if (res?.data?.user) {
+        login(res.data.user);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Google login failed. Please try again.';
+      setGeneralError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  }, [login, navigate]);
+
+  const handleGoogleError = useCallback(() => {
+    setGeneralError('Google sign in was unsuccessful. Please try again.');
+  }, []);
 
   return (
     <div className="w-full relative container-4k min-h-[calc(100vh-5rem)]">
@@ -280,7 +306,24 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-2.5 pt-2 border-t border-white/10 text-center">
+          {/* Google OAuth Login */}
+          <div className="flex items-center gap-2 my-2.5">
+            <div className="h-px bg-white/10 flex-1"></div>
+            <span className="text-[9px] text-neutral-400 font-semibold uppercase tracking-wider">or continue with</span>
+            <div className="h-px bg-white/10 flex-1"></div>
+          </div>
+          <div className="flex justify-center w-full my-1">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              theme="filled_black"
+              shape="pill"
+              size="medium"
+              text="signin_with"
+            />
+          </div>
+
+          <div className="mt-2 pt-2 border-t border-white/10 text-center">
             <p className="text-[10px] text-neutral-400">
               Don't have an account?{' '}
               <Link to="/register" className="font-bold text-[#FF2E7E] hover:underline ml-1">
@@ -431,6 +474,23 @@ const Login = () => {
                     </>
                   )}
                 </button>
+
+                {/* Google OAuth Login */}
+                <div className="flex items-center gap-3 my-1">
+                  <div className="h-px bg-white/10 flex-1"></div>
+                  <span className="text-[11px] text-neutral-400 font-semibold uppercase tracking-wider">or sign in with</span>
+                  <div className="h-px bg-white/10 flex-1"></div>
+                </div>
+                <div className="flex justify-center w-full my-1">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_black"
+                    shape="pill"
+                    size="large"
+                    text="signin_with"
+                  />
+                </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs text-neutral-400">
                   <span>

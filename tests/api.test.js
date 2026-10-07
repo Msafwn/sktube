@@ -116,7 +116,19 @@ describe("SKTUBE Backend API Tests", () => {
         });
     });
 
-    describe("5. CSRF Protection Middleware", () => {
+    describe("5. Google OAuth Validations (POST /api/v1/users/google-login)", () => {
+        it("should return 400 when credential token is missing", async () => {
+            const res = await request(app)
+                .post("/api/v1/users/google-login")
+                .send({});
+
+            assert.strictEqual(res.status, 400);
+            assert.strictEqual(res.body.success, false);
+            assert.match(res.body.message, /credential/i);
+        });
+    });
+
+    describe("6. CSRF Protection Middleware", () => {
         it("should reject cross-site state mutation requests with 403 Forbidden", async () => {
             const res = await request(app)
                 .post("/api/v1/users/login")
