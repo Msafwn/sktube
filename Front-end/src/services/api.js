@@ -5,13 +5,41 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 // Central Axios instance configured for Express backend with httpOnly cookies
 const api = axios.create({
   baseURL: BASE_URL,
+  timeout: 30000, // 30-second default timeout to prevent indefinite hangs
   withCredentials: true, // Automatically pass secure httpOnly cookies (JWT access token & refresh token)
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Response Interceptor with Automatic Cookie-Based Token Refresh on 401
+// =========================================================================
+// REQUEST INTERCEPTOR: Security Headers, FormData Handling & Dev Tracing
+// =========================================================================
+api.interceptors.request.use(
+  (config) => {
+    // 1. Attach standard CSRF defense-in-depth header (unforgeable by cross-site HTML forms)
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+
+    // 2. Dynamic FormData handling: remove hardcoded application/json so browser sets multipart boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
+    // 3. Attach start timestamp in development mode for latency monitoring
+    if (import.meta.env.DEV) {
+      config.metadata = { startTime: performance.now() };
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// =========================================================================
+// RESPONSE INTERCEPTOR: Token Refresh on 401, Session Expiry & Error Format
+// =========================================================================
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -27,7 +55,16 @@ const processQueue = (error) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // In development mode, warn on unusually slow responses (> 3 seconds)
+    if (import.meta.env.DEV && response.config?.metadata?.startTime) {
+      const duration = (performance.now() - response.config.metadata.startTime).toFixed(0);
+      if (duration > 3000) {
+        console.warn(`⚠️ [SLOW API] ${response.config.method?.toUpperCase()} ${response.config.url} took ${duration}ms`);
+      }
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -35,9 +72,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest?._retry) {
       // Don't retry for login, register or refresh-token endpoints to prevent infinite loops
       if (
-        originalRequest.url?.includes('/users/login') ||
-        originalRequest.url?.includes('/users/refresh-token') ||
-        originalRequest.url?.includes('/users/register')
+        originalRequest?.url?.includes('/users/login') ||
+        originalRequest?.url?.includes('/users/refresh-token') ||
+        originalRequest?.url?.includes('/users/register')
       ) {
         const customError = {
           status: 401,
@@ -71,6 +108,12 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr);
+        // Dispatch session expired event so AuthContext resets user state cleanly
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:session-expired', {
+            detail: { message: 'Your session has expired. Please log in again.' }
+          }));
+        }
       } finally {
         isRefreshing = false;
       }
@@ -81,9 +124,15 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Friendly message for timeouts
+    let message = error.response?.data?.message || error.message || 'An unexpected error occurred';
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      message = 'Request timed out. Please check your internet connection and try again.';
+    }
+
     const customError = {
       status: error.response?.status || 500,
-      message: error.response?.data?.message || error.message || 'An unexpected error occurred',
+      message,
       errors: error.response?.data?.errors || [],
       raw: error,
     };

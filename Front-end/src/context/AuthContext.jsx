@@ -41,6 +41,18 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  // Listen for session expiry event dispatched by Axios interceptor on refresh failure
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, []);
+
   // Login: Store user strictly in React in-memory state
   const login = (userData) => {
     setUser(userData);

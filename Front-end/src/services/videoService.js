@@ -16,9 +16,7 @@ export const videoService = {
   // Upload video with Cloudinary/Multer FormData (videoFile & thumbnail)
   async publishVideo(formData, onUploadProgress) {
     const response = await api.post('/videos', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      timeout: 0, // No timeout for large video uploads
       onUploadProgress,
     });
     return response.data;
