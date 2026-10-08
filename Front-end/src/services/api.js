@@ -140,5 +140,51 @@ api.interceptors.response.use(
   }
 );
 
+// =========================================================================
+// IN-FLIGHT REQUEST DEDUPLICATION (For GET Requests)
+// Reuses identical pending in-flight promises across simultaneous callers
+// =========================================================================
+const inFlightRequests = new Map();
+const originalGet = api.get.bind(api);
+
+api.get = (url, config = {}) => {
+  // If explicitly bypassed or signal is already aborted, skip deduplication
+  if (config.skipDedupe || config.signal?.aborted) {
+    return originalGet(url, config);
+  }
+
+  // Create unique signature based on URL and query params
+  const paramKey = config.params ? JSON.stringify(config.params) : '';
+  const dedupeKey = `GET:${url}:${paramKey}`;
+
+  // If identical request is currently in-flight, return the shared pending promise
+  if (inFlightRequests.has(dedupeKey)) {
+    const sharedPromise = inFlightRequests.get(dedupeKey);
+
+    // If caller provided an AbortSignal, link it to this caller's promise
+    if (config.signal) {
+      return new Promise((resolve, reject) => {
+        const onAbort = () => reject(new axios.CanceledError('canceled'));
+        if (config.signal.aborted) return onAbort();
+
+        config.signal.addEventListener('abort', onAbort);
+        sharedPromise
+          .then(resolve, reject)
+          .finally(() => config.signal.removeEventListener('abort', onAbort));
+      });
+    }
+
+    return sharedPromise;
+  }
+
+  // Start new network request and track it in inFlightRequests
+  const promise = originalGet(url, config).finally(() => {
+    inFlightRequests.delete(dedupeKey);
+  });
+
+  inFlightRequests.set(dedupeKey, promise);
+  return promise;
+};
+
 export default api;
 
