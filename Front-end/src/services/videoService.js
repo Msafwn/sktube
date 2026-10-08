@@ -1,15 +1,15 @@
 import api from './api';
 
 export const videoService = {
-  // Get all published videos (with optional pagination & search query)
-  async getAllVideos(params = {}) {
-    const response = await api.get('/videos', { params });
+  // Get all published videos (with optional pagination & search query & AbortSignal)
+  async getAllVideos(params = {}, config = {}) {
+    const response = await api.get('/videos', { params, ...config });
     return response.data;
   },
 
-  // Get single video by ID
-  async getVideoById(videoId) {
-    const response = await api.get(`/videos/${videoId}`);
+  // Get single video by ID (with optional AbortSignal)
+  async getVideoById(videoId, config = {}) {
+    const response = await api.get(`/videos/${videoId}`, config);
     return response.data;
   },
 

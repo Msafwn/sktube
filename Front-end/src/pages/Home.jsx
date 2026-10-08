@@ -83,7 +83,8 @@ const Home = () => {
 
   // Backend Fetch Videos with Debounced Search Query & Pagination
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
+
     const loadVideos = async () => {
       try {
         if (currentPage === 1) {
@@ -103,42 +104,42 @@ const Home = () => {
           params.query = debouncedSearchQuery.trim();
         }
 
-        const res = await videoService.getAllVideos(params);
-        if (isMounted) {
-          let fetched = [];
-          if (res?.data?.videos) {
-            fetched = res.data.videos;
-            if (activeCategory === '🔴 Live 4K') {
-              fetched = fetched.filter(v => v.isLive);
-            }
-            setTotalPages(res.data.totalPages || 1);
-            setTotalVideos(res.data.totalVideos || res.data.videos.length);
-          } else if (Array.isArray(res?.data)) {
-            fetched = res.data;
-            if (activeCategory === '🔴 Live 4K') {
-              fetched = fetched.filter(v => v.isLive);
-            }
-            setTotalPages(1);
-            setTotalVideos(res.data.length);
+        const res = await videoService.getAllVideos(params, { signal: controller.signal });
+        let fetched = [];
+        if (res?.data?.videos) {
+          fetched = res.data.videos;
+          if (activeCategory === '🔴 Live 4K') {
+            fetched = fetched.filter(v => v.isLive);
           }
-
-          // Append videos if loading page > 1, or replace if page 1
-          setVideos(prev => {
-            if (currentPage === 1) return fetched;
-            // Prevent duplicate IDs when appending
-            const existingIds = new Set(prev.map(v => v._id));
-            const uniqueNew = fetched.filter(v => !existingIds.has(v._id));
-            return [...prev, ...uniqueNew];
-          });
-        }
-      } catch (err) {
-        if (isMounted && currentPage === 1) {
-          setVideos([]);
+          setTotalPages(res.data.totalPages || 1);
+          setTotalVideos(res.data.totalVideos || res.data.videos.length);
+        } else if (Array.isArray(res?.data)) {
+          fetched = res.data;
+          if (activeCategory === '🔴 Live 4K') {
+            fetched = fetched.filter(v => v.isLive);
+          }
           setTotalPages(1);
-          setTotalVideos(0);
+          setTotalVideos(res.data.length);
+        }
+
+        // Append videos if loading page > 1, or replace if page 1
+        setVideos(prev => {
+          if (currentPage === 1) return fetched;
+          // Prevent duplicate IDs when appending
+          const existingIds = new Set(prev.map(v => v._id));
+          const uniqueNew = fetched.filter(v => !existingIds.has(v._id));
+          return [...prev, ...uniqueNew];
+        });
+      } catch (err) {
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+          if (currentPage === 1) {
+            setVideos([]);
+            setTotalPages(1);
+            setTotalVideos(0);
+          }
         }
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setLoading(false);
           setLoadingMore(false);
         }
@@ -147,7 +148,7 @@ const Home = () => {
 
     loadVideos();
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [currentPage, limit, debouncedSearchQuery, activeCategory]);
 

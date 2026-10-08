@@ -76,6 +76,11 @@ api.interceptors.response.use(
       }
     }
 
+    // If request was canceled/aborted by AbortController, reject directly without converting to custom 500 error
+    if (axios.isCancel(error) || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+
     const customError = {
       status: error.response?.status || 500,
       message: error.response?.data?.message || error.message || 'An unexpected error occurred',

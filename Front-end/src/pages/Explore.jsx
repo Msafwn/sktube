@@ -78,7 +78,8 @@ const Explore = () => {
   }, [navigate]);
 
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchTrending = async () => {
       try {
         setLoading(true);
@@ -93,38 +94,36 @@ const Explore = () => {
           params.query = selectedCategory.split('&')[0].trim();
         }
 
-        const res = await videoService.getAllVideos(params);
-        if (isMounted) {
-          if (res?.data?.videos) {
-            let fetched = res.data.videos;
-            if (selectedCategory === "Live 4K") {
-              fetched = fetched.filter(v => v.isLive);
-            }
-            setTrendingVideos(fetched);
-            setTotalPages(res.data.totalPages || 1);
-            setTotalVideos(res.data.totalVideos || res.data.videos.length);
-          } else if (Array.isArray(res?.data)) {
-            let fetched = res.data;
-            if (selectedCategory === "Live 4K") {
-              fetched = fetched.filter(v => v.isLive);
-            }
-            setTrendingVideos(fetched);
-            setTotalPages(1);
-            setTotalVideos(res.data.length);
-          } else {
-            setTrendingVideos([]);
-            setTotalPages(1);
-            setTotalVideos(0);
+        const res = await videoService.getAllVideos(params, { signal: controller.signal });
+        if (res?.data?.videos) {
+          let fetched = res.data.videos;
+          if (selectedCategory === "Live 4K") {
+            fetched = fetched.filter(v => v.isLive);
           }
+          setTrendingVideos(fetched);
+          setTotalPages(res.data.totalPages || 1);
+          setTotalVideos(res.data.totalVideos || res.data.videos.length);
+        } else if (Array.isArray(res?.data)) {
+          let fetched = res.data;
+          if (selectedCategory === "Live 4K") {
+            fetched = fetched.filter(v => v.isLive);
+          }
+          setTrendingVideos(fetched);
+          setTotalPages(1);
+          setTotalVideos(res.data.length);
+        } else {
+          setTrendingVideos([]);
+          setTotalPages(1);
+          setTotalVideos(0);
         }
       } catch (err) {
-        if (isMounted) {
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
           setTrendingVideos([]);
           setTotalPages(1);
           setTotalVideos(0);
         }
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setLoading(false);
         }
       }
@@ -132,7 +131,7 @@ const Explore = () => {
 
     fetchTrending();
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [currentPage, limit, selectedCategory]);
 

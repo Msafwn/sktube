@@ -200,14 +200,15 @@ const Watch = () => {
       return;
     }
 
-    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchVideoDetails = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const res = await videoService.getVideoById(videoId);
-        if (isMounted && res?.data) {
+        const res = await videoService.getVideoById(videoId, { signal: controller.signal });
+        if (res?.data) {
           const vidData = res.data;
           setVideo(vidData);
           setIsLiked(Boolean(vidData.isLiked));
@@ -217,37 +218,39 @@ const Watch = () => {
 
           // Fetch Comments
           try {
-            const commentRes = await commentService.getVideoComments(videoId);
-            if (isMounted) {
-              setComments(commentRes?.data?.comments || (Array.isArray(commentRes?.data) ? commentRes.data : []));
-            }
+            const commentRes = await commentService.getVideoComments(videoId, 1, 20, { signal: controller.signal });
+            setComments(commentRes?.data?.comments || (Array.isArray(commentRes?.data) ? commentRes.data : []));
           } catch (e) {
-            console.error('Comments fetch error:', e);
+            if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
+              console.error('Comments fetch error:', e);
+            }
           }
 
           // Fetch Recommendations
           try {
-            const allRes = await videoService.getAllVideos({ limit: 10 });
-            if (isMounted) {
-              const allList = allRes?.data?.videos || (Array.isArray(allRes?.data) ? allRes.data : []);
-              setRecommendedVideos(allList.filter((v) => v._id !== videoId));
-            }
+            const allRes = await videoService.getAllVideos({ limit: 10 }, { signal: controller.signal });
+            const allList = allRes?.data?.videos || (Array.isArray(allRes?.data) ? allRes.data : []);
+            setRecommendedVideos(allList.filter((v) => v._id !== videoId));
           } catch (e) {
-            console.error('Recommendations fetch error:', e);
+            if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
+              console.error('Recommendations fetch error:', e);
+            }
           }
         }
       } catch (err) {
-        if (isMounted) {
-          setError(err.response?.data?.message || 'Failed to load video.');
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+          setError(err.response?.data?.message || err.message || 'Failed to load video.');
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchVideoDetails();
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [videoId]);
 

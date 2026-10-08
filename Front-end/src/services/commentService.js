@@ -1,10 +1,11 @@
 import api from './api';
 
 const commentService = {
-  // Get comments for a video (paginated)
-  getVideoComments: async (videoId, page = 1, limit = 20) => {
+  // Get comments for a video (paginated, with optional AbortSignal)
+  getVideoComments: async (videoId, page = 1, limit = 20, config = {}) => {
     const response = await api.get(`/comments/${videoId}`, {
-      params: { page, limit }
+      params: { page, limit },
+      ...config
     });
     return response.data;
   },

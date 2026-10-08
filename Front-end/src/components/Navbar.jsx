@@ -38,35 +38,39 @@ const Navbar = ({ toggleSidebar, isSidebarCollapsed, currentUser, logout }) => {
   // Debounced Search Value (300ms Delay)
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Live Debounced Search Suggestions API Call
+  // Live Debounced Search Suggestions API Call with AbortController
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchSuggestions = async () => {
       if (!debouncedSearch.trim()) {
-        if (isMounted) {
-          setSearchResults([]);
-          setIsSearching(false);
-        }
+        setSearchResults([]);
+        setIsSearching(false);
         return;
       }
 
       try {
         setIsSearching(true);
-        const res = await videoService.getAllVideos({ query: debouncedSearch.trim(), limit: 5 });
-        if (isMounted) {
-          const list = res?.data?.videos || (Array.isArray(res?.data) ? res.data : []);
-          setSearchResults(list);
-        }
+        const res = await videoService.getAllVideos(
+          { query: debouncedSearch.trim(), limit: 5 },
+          { signal: controller.signal }
+        );
+        const list = res?.data?.videos || (Array.isArray(res?.data) ? res.data : []);
+        setSearchResults(list);
       } catch (err) {
-        if (isMounted) setSearchResults([]);
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+          setSearchResults([]);
+        }
       } finally {
-        if (isMounted) setIsSearching(false);
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     };
 
     fetchSuggestions();
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [debouncedSearch]);
 
