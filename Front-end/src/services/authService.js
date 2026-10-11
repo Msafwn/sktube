@@ -47,18 +47,18 @@ export const authService = {
     return response.data;
   },
 
-  // Update avatar image
+  // Update avatar image (60s timeout for image upload)
   async updateAvatar(formData) {
     const response = await api.patch('/users/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
     });
     return response.data;
   },
 
-  // Update cover image
+  // Update cover image (60s timeout for image upload)
   async updateCoverImage(formData) {
     const response = await api.patch('/users/cover-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
     });
     return response.data;
   },

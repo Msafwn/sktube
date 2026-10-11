@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 // Central Axios instance configured for Express backend with httpOnly cookies
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000, // 30-second default timeout to prevent indefinite hangs
+  timeout: 10000, // 10-second default timeout for fast, responsive user feedback
   withCredentials: true, // Automatically pass secure httpOnly cookies (JWT access token & refresh token)
   headers: {
     'Content-Type': 'application/json',
@@ -25,7 +25,19 @@ api.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
-    // 3. Attach start timestamp in development mode for latency monitoring
+    // 3. Dynamic timeout allocations:
+    // Auth endpoints (bcrypt CPU hashing & Google OAuth network handshake) get 15s
+    if (
+      config.url?.includes('/users/login') ||
+      config.url?.includes('/users/register') ||
+      config.url?.includes('/users/google-login')
+    ) {
+      if (!config.timeout || config.timeout === 10000) {
+        config.timeout = 15000;
+      }
+    }
+
+    // 4. Attach start timestamp in development mode for latency monitoring
     if (import.meta.env.DEV) {
       config.metadata = { startTime: performance.now() };
     }
