@@ -124,14 +124,20 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Friendly message for timeouts
+    // Friendly message for timeouts (Client-side timeout & Socket ETIMEDOUT)
+    const isTimeout = 
+      error.code === 'ECONNABORTED' || 
+      error.code === 'ETIMEDOUT' || 
+      error.message?.toLowerCase().includes('timeout') ||
+      error.message?.toLowerCase().includes('timed out');
+
     let message = error.response?.data?.message || error.message || 'An unexpected error occurred';
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    if (isTimeout) {
       message = 'Request timed out. Please check your internet connection and try again.';
     }
 
     const customError = {
-      status: error.response?.status || 500,
+      status: error.response?.status || (isTimeout ? 408 : 500),
       message,
       errors: error.response?.data?.errors || [],
       raw: error,
