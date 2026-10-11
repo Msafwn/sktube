@@ -134,6 +134,11 @@ const getVideoComments = asyncHandler(async (req, res) => {
         }
     };
 
+    // Agar client ne request timeout ya cancel kar di ho, to query run mat karein
+    if (req.isClientDisconnected?.() || res.writableEnded) {
+        return;
+    }
+
     // 6. mongoose-aggregate-paginate ke through paginated comments result generate kiya
     const comments = await Comment.aggregatePaginate(commentsAggregate, options);
 

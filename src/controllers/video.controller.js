@@ -149,6 +149,11 @@ const getAllVideos = asyncHandler(async (req, res) => {
         }
     };
 
+    // Agar client ne request timeout ya cancel kar di ho, to heavy query run mat karein
+    if (req.isClientDisconnected?.() || res.writableEnded) {
+        return;
+    }
+
     // 7. Video.aggregatePaginate chala kar paginated result hasil kiya
     const videos = await Video.aggregatePaginate(Video.aggregate(pipeline), options);
 

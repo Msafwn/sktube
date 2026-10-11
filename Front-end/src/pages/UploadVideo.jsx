@@ -118,6 +118,7 @@ const UploadVideo = () => {
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    if (loading) return;
 
     const errors = {};
     if (!title.trim()) errors.title = 'Title is required';
