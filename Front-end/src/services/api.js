@@ -7,6 +7,8 @@ const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000, // 10-second default timeout for fast, responsive user feedback
   withCredentials: true, // Automatically pass secure httpOnly cookies (JWT access token & refresh token)
+  maxBodyLength: Infinity, // No body size limit for large video uploads (100MB+)
+  maxContentLength: Infinity, // No content size limit for large payload downloads/streams
   headers: {
     'Content-Type': 'application/json',
   },
