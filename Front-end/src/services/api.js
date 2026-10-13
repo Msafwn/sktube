@@ -136,6 +136,54 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // =========================================================================
+    // AUTOMATIC RETRY WITH EXPONENTIAL BACKOFF
+    // Retries transient network failures & 502/503/504 errors on safe GET requests
+    // =========================================================================
+    if (originalRequest) {
+      const method = (originalRequest.method || 'get').toLowerCase();
+      const isIdempotent = method === 'get' || originalRequest.shouldRetry === true;
+      const isAuthEndpoint =
+        originalRequest.url?.includes('/users/login') ||
+        originalRequest.url?.includes('/users/register') ||
+        originalRequest.url?.includes('/users/refresh-token');
+
+      const isNetworkOrServerError =
+        !error.response ||
+        error.code === 'ERR_NETWORK' ||
+        error.code === 'ETIMEDOUT' ||
+        (error.response?.status >= 502 && error.response?.status <= 504);
+
+      const maxRetries = originalRequest.maxRetries ?? 2;
+      originalRequest.__retryCount = originalRequest.__retryCount || 0;
+
+      if (
+        isIdempotent &&
+        !isAuthEndpoint &&
+        isNetworkOrServerError &&
+        originalRequest.__retryCount < maxRetries &&
+        !originalRequest.signal?.aborted
+      ) {
+        originalRequest.__retryCount += 1;
+        const backoffDelay = originalRequest.__retryCount * 1000; // 1s (1st retry), 2s (2nd retry)
+
+        if (import.meta.env.DEV) {
+          console.warn(
+            `🔄 [API RETRY] Attempt ${originalRequest.__retryCount}/${maxRetries} for ${method.toUpperCase()} ${originalRequest.url} in ${backoffDelay}ms`
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+
+        // If signal was aborted while waiting for backoff delay, abort cleanly
+        if (originalRequest.signal?.aborted) {
+          return Promise.reject(new axios.CanceledError('canceled'));
+        }
+
+        return api(originalRequest);
+      }
+    }
+
     // Friendly message for timeouts (Client-side timeout & Socket ETIMEDOUT)
     const isTimeout = 
       error.code === 'ECONNABORTED' || 
