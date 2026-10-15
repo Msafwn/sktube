@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useActionState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -35,7 +35,7 @@ const Login = () => {
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [generalError, setGeneralError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState(false);
@@ -79,64 +79,65 @@ const Login = () => {
     }
   }, [validateField]);
 
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault();
+  // React 19 Asynchronous Action State for Native Form Submission
+  const [actionState, formAction, isPending] = useActionState(async (prevState, formPayload) => {
+    const usernameOrEmail = formPayload.get('usernameOrEmail')?.trim() || formData.usernameOrEmail.trim();
+    const password = formPayload.get('password') || formData.password;
 
     const errors = {};
-    if (!formData.usernameOrEmail.trim()) {
+    if (!usernameOrEmail) {
       errors.usernameOrEmail = 'Username or email is required';
     }
-    if (!formData.password) {
+    if (!password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
+    } else if (password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
     }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setGeneralError('Please fill in all required fields correctly.');
-      return;
+      return { error: 'Please fill in all required fields correctly.' };
     }
+
+    setFieldErrors({});
+    setGeneralError(null);
 
     try {
-      setLoading(true);
-      setGeneralError(null);
+      const payload = { password };
+      if (usernameOrEmail.includes('@')) {
+        payload.email = usernameOrEmail;
+      } else {
+        payload.username = usernameOrEmail;
+      }
 
-      // Attempt live backend authentication
-      try {
-        const payload = {
-          password: formData.password,
-        };
-        if (formData.usernameOrEmail.includes('@')) {
-          payload.email = formData.usernameOrEmail;
-        } else {
-          payload.username = formData.usernameOrEmail;
-        }
-
-        const res = await authService.login(payload);
-        if (res?.data?.user) {
-          login(res.data.user);
-          setSuccess(true);
-          setTimeout(() => {
-            navigate('/');
-          }, 1000);
-        } else {
-          throw new Error('Invalid response from server');
-        }
-      } catch (err) {
-        const errorMsg = err.response?.data?.message || err.message || 'Invalid user credentials. Please check your details and try again.';
-        setGeneralError(errorMsg);
+      const res = await authService.login(payload);
+      if (res?.data?.user) {
+        login(res.data.user);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+        return { error: null };
+      } else {
+        throw new Error('Invalid response from server');
       }
     } catch (err) {
-      setGeneralError(err.message || 'Invalid user credentials. Please check your details and try again.');
-    } finally {
-      setLoading(false);
+      const errorMsg = err.response?.data?.message || err.message || 'Invalid user credentials. Please check your details and try again.';
+      return { error: errorMsg };
     }
-  }, [formData, login, navigate]);
+  }, { error: null });
+
+  const isSubmitting = isPending || googleLoading;
+  const activeError = generalError || actionState?.error;
+
+  const handleDismissError = useCallback(() => {
+    setGeneralError(null);
+    if (actionState) actionState.error = null;
+  }, [actionState]);
 
   const handleGoogleSuccess = useCallback(async (credentialResponse) => {
     try {
-      setLoading(true);
+      setGoogleLoading(true);
       setGeneralError(null);
       const res = await authService.googleLogin(credentialResponse.credential);
       if (res?.data?.user) {
@@ -152,7 +153,7 @@ const Login = () => {
       const errorMsg = err.response?.data?.message || err.message || 'Google login failed. Please try again.';
       setGeneralError(errorMsg);
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   }, [login, navigate]);
 
@@ -191,15 +192,15 @@ const Login = () => {
             </p>
           </div>
 
-          {generalError && (
+          {activeError && (
             <div className="mb-2.5 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-2 animate-fadeIn">
               <div className="flex items-center gap-2 min-w-0">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span className="leading-snug">{generalError}</span>
+                <span className="leading-snug">{activeError}</span>
               </div>
               <button
                 type="button"
-                onClick={() => setGeneralError(null)}
+                onClick={handleDismissError}
                 className="text-rose-400 hover:text-white p-0.5 rounded cursor-pointer shrink-0 transition-colors"
                 title="Dismiss"
               >
@@ -215,7 +216,7 @@ const Login = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
+          <form action={formAction} className="flex flex-col gap-2.5">
             <div className="flex flex-col gap-0.5">
               <div className="flex justify-between items-center">
                 <label className="text-[9px] font-bold text-neutral-300 uppercase tracking-wider">
@@ -289,10 +290,10 @@ const Login = () => {
 
             <button
               type="submit"
-              disabled={loading || success}
+              disabled={isSubmitting || success}
               className="btn-primary mt-1 w-full py-2.5 text-xs gap-2 disabled:opacity-50 cursor-pointer shadow-xl shadow-[#FF0055]/30"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>Signing in...</span>
@@ -340,15 +341,15 @@ const Login = () => {
       <div className="hidden lg:flex flex-col gap-6 w-full py-4 relative z-10">
         <Login.Header />
 
-        {generalError && (
+        {activeError && (
           <div className="p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm font-semibold flex items-center justify-between gap-3 shadow-xl animate-fadeIn">
             <div className="flex items-center gap-3 min-w-0">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-              <span>{generalError}</span>
+              <span>{activeError}</span>
             </div>
             <button
               type="button"
-              onClick={() => setGeneralError(null)}
+              onClick={handleDismissError}
               className="text-rose-400 hover:text-white p-1 rounded-lg hover:bg-rose-500/20 cursor-pointer shrink-0 transition-colors"
               title="Dismiss"
             >
@@ -381,7 +382,7 @@ const Login = () => {
                 <span className="text-xs text-neutral-500 font-medium">Encrypted Login</span>
               </div>
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <form action={formAction} className="flex flex-col gap-4">
                 {/* Username or Email */}
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between items-center">
@@ -459,10 +460,10 @@ const Login = () => {
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={loading || success}
+                  disabled={isSubmitting || success}
                   className="btn-primary mt-2 w-full py-3.5 2xl:py-4 text-sm font-bold gap-2 shadow-xl shadow-[#FF0055]/30 disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="w-4.5 h-4.5 animate-spin" />
                       <span>Authenticating Credentials...</span>
