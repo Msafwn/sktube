@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useReducer, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -12,108 +12,253 @@ import {
 import videoService from '../services/videoService';
 
 // ==========================================
-// MAIN COMPOUND ROOT COMPONENT: UploadVideo
+// 1. INITIAL STATE & REDUCER DEFINITION
+// ==========================================
+const initialUploadState = {
+  title: '',
+  description: '',
+  category: 'tech',
+  visibility: 'public',
+  videoFile: null,
+  thumbnail: null,
+  thumbnailPreview: null,
+  loading: false,
+  uploadProgress: 0,
+  message: null,
+  fieldErrors: {}
+};
+
+function uploadReducer(state, action) {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        [action.field]: action.value,
+        fieldErrors: {
+          ...state.fieldErrors,
+          [action.field]: action.error !== undefined ? action.error : state.fieldErrors[action.field]
+        },
+        message: state.message?.type === 'error' ? null : state.message
+      };
+
+    case 'SET_FIELD_ERROR':
+      return {
+        ...state,
+        fieldErrors: {
+          ...state.fieldErrors,
+          [action.field]: action.error
+        }
+      };
+
+    case 'SET_MULTIPLE_ERRORS':
+      return {
+        ...state,
+        fieldErrors: {
+          ...state.fieldErrors,
+          ...action.errors
+        }
+      };
+
+    case 'SET_VIDEO_FILE':
+      return {
+        ...state,
+        videoFile: action.file,
+        fieldErrors: {
+          ...state.fieldErrors,
+          videoFile: ''
+        },
+        message: state.message?.type === 'error' ? null : state.message
+      };
+
+    case 'REMOVE_VIDEO_FILE':
+      return {
+        ...state,
+        videoFile: null
+      };
+
+    case 'SET_THUMBNAIL':
+      return {
+        ...state,
+        thumbnail: action.file,
+        thumbnailPreview: action.preview,
+        fieldErrors: {
+          ...state.fieldErrors,
+          thumbnail: ''
+        },
+        message: state.message?.type === 'error' ? null : state.message
+      };
+
+    case 'REMOVE_THUMBNAIL':
+      return {
+        ...state,
+        thumbnail: null,
+        thumbnailPreview: null
+      };
+
+    case 'SET_MESSAGE':
+      return {
+        ...state,
+        message: action.message
+      };
+
+    case 'START_UPLOAD':
+      return {
+        ...state,
+        loading: true,
+        uploadProgress: 0,
+        message: null
+      };
+
+    case 'SET_PROGRESS':
+      return {
+        ...state,
+        uploadProgress: action.progress
+      };
+
+    case 'UPLOAD_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        uploadProgress: 100,
+        message: {
+          type: 'success',
+          text: action.text || 'Video published successfully!'
+        },
+        title: '',
+        description: '',
+        videoFile: null,
+        thumbnail: null,
+        thumbnailPreview: null,
+        fieldErrors: {}
+      };
+
+    case 'UPLOAD_ERROR':
+      return {
+        ...state,
+        loading: false,
+        uploadProgress: 0,
+        message: {
+          type: 'error',
+          text: action.text
+        }
+      };
+
+    default:
+      return state;
+  }
+}
+
+// ==========================================
+// 2. MAIN COMPOUND ROOT COMPONENT: UploadVideo
 // ==========================================
 const UploadVideo = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('tech');
-  const [visibility, setVisibility] = useState('public');
-  const [videoFile, setVideoFile] = useState(null);
-  const [thumbnail, setThumbnail] = useState(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [message, setMessage] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
 
-  // Field validator useCallback
-  const validateField = useCallback((name, value) => {
-    let error = '';
-    switch (name) {
-      case 'title':
-        if (!value.trim()) error = 'Title is required';
-        else if (value.trim().length < 3) error = 'Min 3 characters';
-        break;
-      case 'description':
-        if (!value.trim()) error = 'Description is required';
-        break;
-      case 'videoFile':
-        if (!value) error = 'Video file is required';
-        break;
-      case 'thumbnail':
-        if (!value) error = 'Thumbnail is required';
-        break;
-      default:
-        break;
-    }
-    setFieldErrors((prev) => ({ ...prev, [name]: error }));
-    if (message?.type === 'error') setMessage(null);
-    return !error;
-  }, [message]);
+  // Central useReducer managing all form, media and upload states
+  const [state, dispatch] = useReducer(uploadReducer, initialUploadState);
+  const {
+    title,
+    description,
+    category,
+    visibility,
+    videoFile,
+    thumbnail,
+    thumbnailPreview,
+    loading,
+    uploadProgress,
+    message,
+    fieldErrors
+  } = state;
+
+  const setCategory = useCallback((val) => {
+    dispatch({ type: 'SET_FIELD', field: 'category', value: val });
+  }, []);
+
+  const setVisibility = useCallback((val) => {
+    dispatch({ type: 'SET_FIELD', field: 'visibility', value: val });
+  }, []);
+
+  const handleCloseMessage = useCallback(() => {
+    dispatch({ type: 'SET_MESSAGE', message: null });
+  }, []);
 
   const handleTitleChange = useCallback((e) => {
     const val = e.target.value;
-    setTitle(val);
-    validateField('title', val);
-  }, [validateField]);
+    let error = '';
+    if (!val.trim()) error = 'Title is required';
+    else if (val.trim().length < 3) error = 'Min 3 characters';
+    dispatch({ type: 'SET_FIELD', field: 'title', value: val, error });
+  }, []);
 
   const handleDescriptionChange = useCallback((e) => {
     const val = e.target.value;
-    setDescription(val);
-    validateField('description', val);
-  }, [validateField]);
+    const error = !val.trim() ? 'Description is required' : '';
+    dispatch({ type: 'SET_FIELD', field: 'description', value: val, error });
+  }, []);
 
   const handleVideoChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('video/')) {
-        setFieldErrors((prev) => ({ ...prev, videoFile: 'Must be a valid video file (.mp4, .mov, etc.)' }));
+        dispatch({
+          type: 'SET_FIELD_ERROR',
+          field: 'videoFile',
+          error: 'Must be a valid video file (.mp4, .mov, etc.)'
+        });
         return;
       }
       // Check 100MB Cloudinary limit
       if (file.size > 100 * 1024 * 1024) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        setFieldErrors((prev) => ({ ...prev, videoFile: `File is ${sizeMB}MB. Max allowed is 100MB.` }));
-        setMessage({
-          type: 'error',
-          text: `Video file (${sizeMB}MB) exceeds Cloudinary's 100MB limit. Please select a video under 100MB.`
+        dispatch({
+          type: 'SET_FIELD_ERROR',
+          field: 'videoFile',
+          error: `File is ${sizeMB}MB. Max allowed is 100MB.`
+        });
+        dispatch({
+          type: 'SET_MESSAGE',
+          message: {
+            type: 'error',
+            text: `Video file (${sizeMB}MB) exceeds Cloudinary's 100MB limit. Please select a video under 100MB.`
+          }
         });
         return;
       }
-      setVideoFile(file);
-      setFieldErrors((prev) => ({ ...prev, videoFile: '' }));
-      if (message?.type === 'error') setMessage(null);
+      dispatch({ type: 'SET_VIDEO_FILE', file });
     }
-  }, [message]);
+  }, []);
 
   const handleThumbnailChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setFieldErrors((prev) => ({ ...prev, thumbnail: 'Must be an image file (.jpg, .png, .webp)' }));
+        dispatch({
+          type: 'SET_FIELD_ERROR',
+          field: 'thumbnail',
+          error: 'Must be an image file (.jpg, .png, .webp)'
+        });
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setFieldErrors((prev) => ({ ...prev, thumbnail: 'Image size must be under 5MB' }));
+        dispatch({
+          type: 'SET_FIELD_ERROR',
+          field: 'thumbnail',
+          error: 'Image size must be under 5MB'
+        });
         return;
       }
-      setThumbnail(file);
-      setThumbnailPreview(URL.createObjectURL(file));
-      setFieldErrors((prev) => ({ ...prev, thumbnail: '' }));
-      if (message?.type === 'error') setMessage(null);
+      const preview = URL.createObjectURL(file);
+      dispatch({ type: 'SET_THUMBNAIL', file, preview });
     }
-  }, [message]);
+  }, []);
 
   const handleRemoveVideo = useCallback(() => {
-    setVideoFile(null);
+    dispatch({ type: 'REMOVE_VIDEO_FILE' });
   }, []);
 
   const handleRemoveThumbnail = useCallback(() => {
-    setThumbnail(null);
-    setThumbnailPreview(null);
+    dispatch({ type: 'REMOVE_THUMBNAIL' });
   }, []);
 
   const handleSubmit = useCallback(async (e) => {
@@ -127,14 +272,16 @@ const UploadVideo = () => {
     if (!thumbnail) errors.thumbnail = 'Please select a thumbnail image';
 
     if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setMessage({ type: 'error', text: 'Please fill all required fields and choose your media files.' });
+      dispatch({ type: 'SET_MULTIPLE_ERRORS', errors });
+      dispatch({
+        type: 'SET_MESSAGE',
+        message: { type: 'error', text: 'Please fill all required fields and choose your media files.' }
+      });
       return;
     }
 
     try {
-      setLoading(true);
-      setMessage(null);
+      dispatch({ type: 'START_UPLOAD' });
 
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -147,24 +294,16 @@ const UploadVideo = () => {
       const res = await videoService.publishVideo(formData, (progressEvent) => {
         if (progressEvent?.total) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
+          dispatch({ type: 'SET_PROGRESS', progress: percentCompleted });
         }
       });
 
-      setMessage({
-        type: 'success',
+      dispatch({
+        type: 'UPLOAD_SUCCESS',
         text: 'Video published successfully to Sktube! Redirecting to your video...'
       });
 
-      // Clear Form
-      setTitle('');
-      setDescription('');
-      setVideoFile(null);
-      setThumbnail(null);
-      setThumbnailPreview(null);
-      setFieldErrors({});
-
-      // If video created successfully, navigate to watch page after 1.5 seconds
+      // Navigate to newly published video after 1.5s
       const newVideoId = res?.data?._id;
       if (newVideoId) {
         setTimeout(() => {
@@ -173,15 +312,12 @@ const UploadVideo = () => {
       }
     } catch (err) {
       console.error('Upload error:', err);
-      setMessage({
-        type: 'error',
+      dispatch({
+        type: 'UPLOAD_ERROR',
         text: err.response?.data?.message || err.message || 'Error uploading video. Please login first or verify file format.'
       });
-    } finally {
-      setLoading(false);
-      setUploadProgress(0);
     }
-  }, [title, description, videoFile, thumbnail, category, visibility, navigate]);
+  }, [loading, title, description, videoFile, thumbnail, category, visibility, navigate]);
 
   // If user is not logged in, prompt to login
   if (!user) {
@@ -236,14 +372,14 @@ const UploadVideo = () => {
         loading={loading}
         uploadProgress={uploadProgress}
         message={message}
-        onCloseMessage={() => setMessage(null)}
+        onCloseMessage={handleCloseMessage}
         fieldErrors={fieldErrors}
       />
 
       {/* 🖥️ Desktop / 4K Layout */}
       <div className="hidden md:flex flex-col gap-6 min-h-[calc(100vh-6rem)]">
         <UploadHeader />
-        <UploadAlert message={message} onClose={() => setMessage(null)} />
+        <UploadAlert message={message} onClose={handleCloseMessage} />
 
         <form onSubmit={handleSubmit} className="grid grid-cols-12 gap-6 relative z-10">
           <div className="col-span-12 md:col-span-7 flex flex-col gap-4">
