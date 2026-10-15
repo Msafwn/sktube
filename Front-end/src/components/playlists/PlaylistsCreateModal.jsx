@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useActionState } from 'react';
 import { 
   FolderPlus, 
   X, 
@@ -6,7 +6,8 @@ import {
   Globe, 
   Film, 
   Search, 
-  Check 
+  Check,
+  Loader2
 } from 'lucide-react';
 import videoService from '../../services/videoService';
 
@@ -59,21 +60,32 @@ const PlaylistsCreateModal = ({ isOpen, onClose, onCreate }) => {
     v.owner?.fullName?.toLowerCase().includes(videoSearch.toLowerCase())
   );
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    onCreate({ 
-      name, 
-      description, 
-      isPrivate,
-      selectedVideoIds 
-    });
-    setName('');
-    setDescription('');
-    setIsPrivate(false);
-    setSelectedVideoIds([]);
-    onClose();
-  };
+  // React 19 Async Form Action State
+  const [formState, formAction, isPending] = useActionState(async (prevState, formData) => {
+    const playlistName = formData.get('name')?.trim() || name.trim();
+    const playlistDesc = formData.get('description')?.trim() || description.trim();
+
+    if (!playlistName) {
+      return { error: 'Playlist name is required' };
+    }
+
+    try {
+      await onCreate({ 
+        name: playlistName, 
+        description: playlistDesc, 
+        isPrivate,
+        selectedVideoIds 
+      });
+      setName('');
+      setDescription('');
+      setIsPrivate(false);
+      setSelectedVideoIds([]);
+      onClose();
+      return { error: null };
+    } catch (err) {
+      return { error: err?.message || 'Failed to create playlist' };
+    }
+  }, { error: null });
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -97,17 +109,25 @@ const PlaylistsCreateModal = ({ isOpen, onClose, onCreate }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+        <form action={formAction} className="flex flex-col gap-3.5 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+          {formState?.error && (
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+              {formState.error}
+            </div>
+          )}
+
           {/* Playlist Title */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-neutral-300">Playlist Name *</label>
             <input
+              name="name"
               type="text"
               placeholder="e.g. 4K Cinema Masterpieces, Tutorials..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="bg-[#12121c] border border-white/10 focus:border-[#FF0055]/50 rounded-xl px-3.5 h-10 text-xs sm:text-sm text-white placeholder-neutral-500 outline-none transition-colors"
               autoFocus
+              required
             />
           </div>
 
@@ -115,6 +135,7 @@ const PlaylistsCreateModal = ({ isOpen, onClose, onCreate }) => {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-neutral-300">Description (Optional)</label>
             <input
+              name="description"
               type="text"
               placeholder="Describe what this playlist is about..."
               value={description}
@@ -229,10 +250,15 @@ const PlaylistsCreateModal = ({ isOpen, onClose, onCreate }) => {
             </button>
             <button
               type="submit"
-              disabled={!name.trim()}
-              className="btn-primary px-5 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer shadow-lg shadow-[#FF0055]/30"
+              disabled={isPending || !name.trim()}
+              className="btn-primary px-5 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer shadow-lg shadow-[#FF0055]/30 flex items-center gap-2"
             >
-              <span>Create Playlist {selectedVideoIds.length > 0 ? `(${selectedVideoIds.length} Videos)` : ''}</span>
+              {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>
+                {isPending 
+                  ? 'Creating Playlist...' 
+                  : `Create Playlist ${selectedVideoIds.length > 0 ? `(${selectedVideoIds.length} Videos)` : ''}`}
+              </span>
             </button>
           </div>
         </form>
