@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Film, 
@@ -29,6 +29,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeCategory, setActiveCategory] = useState('✨ All Cinema');
+  const [isPending, startTransition] = useTransition();
 
   // Search Params
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,12 +63,14 @@ const Home = () => {
     return `${mins}:${secs}`;
   }, []);
 
-  // Category Selection useCallback
+  // Category Selection with React 19 Concurrent useTransition
   const handleSelectCategory = useCallback((categoryName) => {
-    setActiveCategory(categoryName);
-    setCurrentPage(1);
-    setVideos([]);
-  }, []);
+    startTransition(() => {
+      setActiveCategory(categoryName);
+      setCurrentPage(1);
+      setVideos([]);
+    });
+  }, [startTransition]);
 
   // Watch Video Handler
   const handleWatchStream = useCallback((video) => {
@@ -181,8 +184,10 @@ const Home = () => {
   }, [debouncedSearchQuery]);
 
   const clearSearch = () => {
-    searchParams.delete('query');
-    setSearchParams(searchParams);
+    startTransition(() => {
+      searchParams.delete('query');
+      setSearchParams(searchParams);
+    });
   };
 
   // Featured Spotlight Hero (First video on Page 1 without search)
@@ -218,16 +223,19 @@ const Home = () => {
       <HomeFilters 
         categories={categories} 
         activeCategory={activeCategory} 
-        onSelectCategory={handleSelectCategory} 
+        onSelectCategory={handleSelectCategory}
+        isPending={isPending}
       />
 
-      {/* 3. Stream Video Grid */}
-      <HomeGrid 
-        videos={videos} 
-        formatDuration={formatDuration} 
-        onWatch={handleWatchStream} 
-        loading={loading}
-      />
+      {/* 3. Stream Video Grid with Smooth Transition */}
+      <div className={`transition-opacity duration-300 ${isPending ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
+        <HomeGrid 
+          videos={videos} 
+          formatDuration={formatDuration} 
+          onWatch={handleWatchStream} 
+          loading={loading}
+        />
+      </div>
 
       {/* 4. Infinite Scroll Indicators */}
       <div className="flex flex-col items-center justify-center py-6">

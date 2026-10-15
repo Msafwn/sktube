@@ -17,6 +17,8 @@ const HomeCard = ({ video, formatDuration, onWatch }) => {
         <img 
           src={video.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=350&fit=crop"} 
           alt={video.title} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out" 
         />
 
@@ -49,6 +51,8 @@ const HomeCard = ({ video, formatDuration, onWatch }) => {
           <img 
             src={video.owner?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop"} 
             alt={video.owner?.fullName || "Creator"} 
+            loading="lazy"
+            decoding="async"
             className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10" 
           />
         </div>
