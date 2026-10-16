@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useOptimistic, useTransition } from 'react';
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -36,16 +36,68 @@ const Watch = () => {
   // Recommendations / Up Next
   const [recommendedVideos, setRecommendedVideos] = useState([]);
 
-  // Likes & Interactions
-  const [isLiked, setIsLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(0);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscribersCount, setSubscribersCount] = useState(0);
+  // Video Likes with React 19 useOptimistic
+  const [likeState, setLikeState] = useState({ isLiked: false, likesCount: 0 });
+  const [isLikePending, startLikeTransition] = useTransition();
+  const [optimisticLike, setOptimisticLike] = useOptimistic(
+    likeState,
+    (current, update = {}) => ({
+      isLiked: update.isLiked !== undefined ? update.isLiked : !current.isLiked,
+      likesCount: update.likesCount !== undefined 
+        ? update.likesCount 
+        : (current.isLiked ? Math.max(0, current.likesCount - 1) : current.likesCount + 1)
+    })
+  );
 
-  // Comments
+  // Channel Subscriptions with React 19 useOptimistic
+  const [subState, setSubState] = useState({ isSubscribed: false, subscribersCount: 0 });
+  const [isSubPending, startSubTransition] = useTransition();
+  const [optimisticSub, setOptimisticSub] = useOptimistic(
+    subState,
+    (current, update = {}) => {
+      const nextSub = update.isSubscribed !== undefined ? update.isSubscribed : !current.isSubscribed;
+      return {
+        isSubscribed: nextSub,
+        subscribersCount: update.subscribersCount !== undefined 
+          ? update.subscribersCount 
+          : (nextSub ? current.subscribersCount + 1 : Math.max(0, current.subscribersCount - 1))
+      };
+    }
+  );
+
+  // Comments with React 19 useOptimistic
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [isCommentPending, startCommentTransition] = useTransition();
+
+  const [optimisticComments, setOptimisticComments] = useOptimistic(
+    comments,
+    (currentList, action) => {
+      if (action.type === 'ADD_COMMENT') {
+        return [action.comment, ...currentList];
+      }
+      if (action.type === 'TOGGLE_LIKE') {
+        return currentList.map((c) => {
+          if (c._id && action.commentId && c._id.toString() === action.commentId.toString()) {
+            const nextLiked = !c.isLiked;
+            return {
+              ...c,
+              isLiked: nextLiked,
+              likesCount: nextLiked ? (c.likesCount || 0) + 1 : Math.max(0, (c.likesCount || 1) - 1)
+            };
+          }
+          return c;
+        });
+      }
+      if (action.type === 'DELETE_COMMENT') {
+        return currentList.filter(
+          (c) => c._id?.toString() !== action.commentId?.toString() && c.parentComment?.toString() !== action.commentId?.toString()
+        );
+      }
+      return currentList;
+    }
+  );
 
   // Watch Later Save state
   const [isSavedWatchLater, setIsSavedWatchLater] = useState(false);
@@ -232,10 +284,14 @@ const Watch = () => {
           const vidData = res.data;
           setVideo(vidData);
           setLoading(false); // Unblock video player immediately for instant playback
-          setIsLiked(Boolean(vidData.isLiked));
-          setLikesCount(typeof vidData.likesCount === 'number' ? vidData.likesCount : (vidData.views ? Math.floor(vidData.views / 10) : 0));
-          setIsSubscribed(Boolean(vidData.owner?.isSubscribed));
-          setSubscribersCount(vidData.owner?.subscribersCount || 0);
+          setLikeState({
+            isLiked: Boolean(vidData.isLiked),
+            likesCount: typeof vidData.likesCount === 'number' ? vidData.likesCount : (vidData.views ? Math.floor(vidData.views / 10) : 0)
+          });
+          setSubState({
+            isSubscribed: Boolean(vidData.owner?.isSubscribed),
+            subscribersCount: vidData.owner?.subscribersCount || 0
+          });
 
           // Fetch Comments & Recommendations concurrently in the background
           Promise.allSettled([
@@ -310,7 +366,7 @@ const Watch = () => {
 
       const handleVideoLiked = ({ likesCount: updatedLikes }) => {
         if (typeof updatedLikes === 'number') {
-          setLikesCount(updatedLikes);
+          setLikeState((prev) => ({ ...prev, likesCount: updatedLikes }));
         }
       };
 
@@ -331,45 +387,56 @@ const Watch = () => {
     };
   }, [videoId, socket, joinStream, leaveStream]);
 
-  // Toggle Video Like
-  const handleLikeToggle = useCallback(async () => {
+  // Toggle Video Like with React 19 useOptimistic
+  const handleLikeToggle = useCallback(() => {
     if (!video?._id) return;
-    const nextLiked = !isLiked;
-    const nextCount = nextLiked ? likesCount + 1 : Math.max(0, likesCount - 1);
-    setIsLiked(nextLiked);
-    setLikesCount(nextCount);
-
-    try {
-      const res = await likeService.toggleVideoLike(video._id);
-      if (res?.data) {
-        setIsLiked(Boolean(res.data.isLiked));
-        if (typeof res.data.likesCount === 'number') {
-          setLikesCount(res.data.likesCount);
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling like:', err);
+    if (!user) {
+      navigate('/login');
+      return;
     }
-  }, [video?._id, isLiked, likesCount]);
 
-  // Toggle Channel Subscription
-  const handleSubscribeToggle = useCallback(async () => {
+    startLikeTransition(async () => {
+      setOptimisticLike({}); // Optimistically flip like state & counter immediately
+      try {
+        const res = await likeService.toggleVideoLike(video._id);
+        if (res?.data) {
+          setLikeState({
+            isLiked: Boolean(res.data.isLiked),
+            likesCount: typeof res.data.likesCount === 'number' ? res.data.likesCount : likeState.likesCount
+          });
+        }
+      } catch (err) {
+        console.error('Error toggling like:', err);
+      }
+    });
+  }, [video?._id, user, navigate, likeState.likesCount, setOptimisticLike]);
+
+  // Toggle Channel Subscription with React 19 useOptimistic
+  const handleSubscribeToggle = useCallback(() => {
     const ownerId = video?.owner?._id;
     if (!ownerId) return;
-
-    const nextSub = !isSubscribed;
-    setIsSubscribed(nextSub);
-    setSubscribersCount((c) => (nextSub ? c + 1 : Math.max(0, c - 1)));
-
-    try {
-      const res = await subscriptionService.toggleSubscription(ownerId);
-      if (res?.data) {
-        setIsSubscribed(Boolean(res.data.isSubscribed));
-      }
-    } catch (err) {
-      console.error('Error toggling subscription:', err);
+    if (!user) {
+      navigate('/login');
+      return;
     }
-  }, [video?.owner?._id, isSubscribed]);
+
+    startSubTransition(async () => {
+      setOptimisticSub({}); // Optimistically flip subscribed & counter immediately
+      try {
+        const res = await subscriptionService.toggleSubscription(ownerId);
+        if (res?.data) {
+          setSubState((prev) => ({
+            isSubscribed: Boolean(res.data.isSubscribed),
+            subscribersCount: prev.isSubscribed !== Boolean(res.data.isSubscribed)
+              ? (res.data.isSubscribed ? prev.subscribersCount + 1 : Math.max(0, prev.subscribersCount - 1))
+              : prev.subscribersCount
+          }));
+        }
+      } catch (err) {
+        console.error('Error toggling subscription:', err);
+      }
+    });
+  }, [video?.owner?._id, user, navigate, setOptimisticSub]);
 
   // Watch Later toggle with 600ms throttling
   const handleToggleWatchLater = useThrottleCallback(async () => {
@@ -495,8 +562,8 @@ const Watch = () => {
     }
   }, []);
 
-  // Submit Comment
-  const handleCommentSubmit = useCallback(async (e) => {
+  // Submit Comment with React 19 useOptimistic
+  const handleCommentSubmit = useCallback((e) => {
     e.preventDefault();
     if (!user) {
       navigate('/login');
@@ -505,12 +572,14 @@ const Watch = () => {
     if (!commentInput.trim() || !videoId) return;
 
     const content = commentInput.trim();
-    setSubmittingComment(true);
+    setCommentInput('');
 
     const tempComment = {
       _id: `temp-${Date.now()}`,
       content,
       createdAt: new Date().toISOString(),
+      likesCount: 0,
+      isLiked: false,
       owner: {
         _id: user?._id,
         fullName: user?.fullName || 'You',
@@ -519,66 +588,59 @@ const Watch = () => {
       }
     };
 
-    setComments((prev) => [tempComment, ...prev]);
-    setCommentInput('');
+    startCommentTransition(async () => {
+      setOptimisticComments({ type: 'ADD_COMMENT', comment: tempComment });
+      setSubmittingComment(true);
 
-    try {
-      const res = await commentService.addComment(videoId, content);
-      if (res?.data?._id) {
-        setComments((prev) => prev.map((c) => c._id === tempComment._id ? res.data : c));
+      try {
+        const res = await commentService.addComment(videoId, content);
+        if (res?.data?._id) {
+          setComments((prev) => [res.data, ...prev.filter((c) => c._id !== tempComment._id)]);
+        }
+      } catch (err) {
+        console.error('Error adding comment:', err);
+      } finally {
+        setSubmittingComment(false);
       }
-    } catch (err) {
-      console.error('Error adding comment:', err);
-      setComments((prev) => prev.filter((c) => c._id !== tempComment._id));
-    } finally {
-      setSubmittingComment(false);
-    }
-  }, [commentInput, videoId, user, navigate]);
+    });
+  }, [commentInput, videoId, user, navigate, setOptimisticComments]);
 
   // Reply State
   const [replyingToId, setReplyingToId] = useState(null);
   const [replyInput, setReplyInput] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  // Toggle Comment Like
-  const handleCommentLikeToggle = useCallback(async (commentId) => {
+  // Toggle Comment Like with React 19 useOptimistic
+  const handleCommentLikeToggle = useCallback((commentId) => {
     if (!user) {
       navigate('/login');
       return;
     }
     if (!commentId) return;
 
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c._id && commentId && c._id.toString() === commentId.toString()) {
-          const nextLiked = !c.isLiked;
-          const nextCount = nextLiked ? (c.likesCount || 0) + 1 : Math.max(0, (c.likesCount || 1) - 1);
-          return { ...c, isLiked: nextLiked, likesCount: nextCount };
+    startCommentTransition(async () => {
+      setOptimisticComments({ type: 'TOGGLE_LIKE', commentId });
+      try {
+        const res = await likeService.toggleCommentLike(commentId);
+        if (res?.data) {
+          setComments((prev) =>
+            prev.map((c) => {
+              if (c._id && commentId && c._id.toString() === commentId.toString()) {
+                return {
+                  ...c,
+                  isLiked: res.data.isLiked !== undefined ? Boolean(res.data.isLiked) : c.isLiked,
+                  likesCount: typeof res.data.likesCount === 'number' ? res.data.likesCount : c.likesCount
+                };
+              }
+              return c;
+            })
+          );
         }
-        return c;
-      })
-    );
-
-    try {
-      const res = await likeService.toggleCommentLike(commentId);
-      if (res?.data) {
-        setComments((prev) =>
-          prev.map((c) => {
-            if (c._id && commentId && c._id.toString() === commentId.toString()) {
-              return {
-                ...c,
-                isLiked: res.data.isLiked !== undefined ? Boolean(res.data.isLiked) : c.isLiked,
-                likesCount: typeof res.data.likesCount === 'number' ? res.data.likesCount : c.likesCount
-              };
-            }
-            return c;
-          })
-        );
+      } catch (err) {
+        console.error('Error toggling comment like:', err);
       }
-    } catch (err) {
-      console.error('Error toggling comment like:', err);
-    }
-  }, [user, navigate]);
+    });
+  }, [user, navigate, setOptimisticComments]);
 
   // Submit Reply to a comment
   const handleReplySubmit = useCallback(async (parentCommentId) => {
@@ -623,15 +685,18 @@ const Watch = () => {
     }
   }, [replyInput, videoId, user, navigate]);
 
-  // Delete Comment
-  const handleDeleteComment = useCallback(async (commentId) => {
-    setComments((prev) => prev.filter((c) => c._id !== commentId && c.parentComment !== commentId));
-    try {
-      await commentService.deleteComment(commentId);
-    } catch (err) {
-      console.error('Error deleting comment:', err);
-    }
-  }, []);
+  // Delete Comment with React 19 useOptimistic
+  const handleDeleteComment = useCallback((commentId) => {
+    startCommentTransition(async () => {
+      setOptimisticComments({ type: 'DELETE_COMMENT', commentId });
+      try {
+        await commentService.deleteComment(commentId);
+        setComments((prev) => prev.filter((c) => c._id !== commentId && c.parentComment !== commentId));
+      } catch (err) {
+        console.error('Error deleting comment:', err);
+      }
+    });
+  }, [setOptimisticComments]);
 
   if (loading) {
     return (
@@ -697,11 +762,11 @@ const Watch = () => {
           <WatchVideoInfo
             video={video}
             user={user}
-            subscribersCount={subscribersCount}
-            isSubscribed={isSubscribed}
+            subscribersCount={optimisticSub.subscribersCount}
+            isSubscribed={optimisticSub.isSubscribed}
             onSubscribeToggle={handleSubscribeToggle}
-            isLiked={isLiked}
-            likesCount={likesCount}
+            isLiked={optimisticLike.isLiked}
+            likesCount={optimisticLike.likesCount}
             onLikeToggle={handleLikeToggle}
             copied={copied}
             onShare={handleShare}
@@ -722,7 +787,7 @@ const Watch = () => {
 
           {/* 4. Comments Section */}
           <WatchComments
-            comments={comments}
+            comments={optimisticComments}
             commentInput={commentInput}
             onCommentInputChange={setCommentInput}
             onCommentSubmit={handleCommentSubmit}
