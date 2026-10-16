@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -24,8 +24,9 @@ const Watch = () => {
   const { user } = useAuth();
   const { socket, joinStream, leaveStream, joinWatchParty, leaveWatchParty, syncPartyAction } = useSocket();
   const navigate = useNavigate();
+  const { videoId: routeVideoId } = useParams();
   const [searchParams] = useSearchParams();
-  const videoId = searchParams.get('v');
+  const videoId = searchParams.get('v') || routeVideoId;
   const videoRef = useRef(null);
 
   const [video, setVideo] = useState(null);
@@ -195,9 +196,28 @@ const Watch = () => {
   // Fetch Main Video & Related Content
   useEffect(() => {
     if (!videoId) {
-      setError('No video specified.');
-      setLoading(false);
-      return;
+      // Auto-fallback: If no video ID specified, fetch the first available video instead of showing dead-end error
+      let isMounted = true;
+      videoService.getAllVideos({ limit: 1 })
+        .then((res) => {
+          if (!isMounted) return;
+          const videos = res?.data?.videos || (Array.isArray(res?.data) ? res.data : []);
+          if (videos.length > 0 && videos[0]?._id) {
+            navigate(`/watch?v=${videos[0]._id}`, { replace: true });
+          } else {
+            setError('No videos currently available.');
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setError('No video specified.');
+            setLoading(false);
+          }
+        });
+      return () => {
+        isMounted = false;
+      };
     }
 
     const controller = new AbortController();
@@ -236,6 +256,8 @@ const Watch = () => {
               console.error('Recommendations fetch error:', e);
             }
           }
+        } else {
+          setError("We couldn't find the video you requested. It might have been removed by the creator.");
         }
       } catch (err) {
         if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
@@ -252,7 +274,7 @@ const Watch = () => {
     return () => {
       controller.abort();
     };
-  }, [videoId]);
+  }, [videoId, navigate]);
 
   // Join Video Stream Room and Listen for Real-Time Comments & Likes
   useEffect(() => {
@@ -631,12 +653,20 @@ const Watch = () => {
         <p className="text-sm text-neutral-400 mt-2 mb-6">
           {error || "We couldn't find the video you requested. It might have been removed by the creator."}
         </p>
-        <button
-          onClick={() => navigate('/')}
-          className="btn-primary text-white text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer"
-        >
-          Return to Home
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => navigate('/')}
+            className="btn-primary text-white text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer"
+          >
+            Return to Home
+          </button>
+          <button
+            onClick={() => navigate('/explore')}
+            className="px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold border border-white/10 transition-colors cursor-pointer"
+          >
+            Explore Videos
+          </button>
+        </div>
       </div>
     );
   }

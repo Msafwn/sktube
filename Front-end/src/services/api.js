@@ -245,12 +245,29 @@ api.get = (url, config = {}) => {
     return sharedPromise;
   }
 
+  // Separate caller's signal so one caller aborting does NOT cancel the shared underlying request
+  const { signal, ...sharedConfig } = config;
+
   // Start new network request and track it in inFlightRequests
-  const promise = originalGet(url, config).finally(() => {
+  const promise = originalGet(url, sharedConfig).finally(() => {
     inFlightRequests.delete(dedupeKey);
   });
 
   inFlightRequests.set(dedupeKey, promise);
+
+  // If caller provided an AbortSignal, return a consumer promise linked to that signal
+  if (signal) {
+    return new Promise((resolve, reject) => {
+      const onAbort = () => reject(new axios.CanceledError('canceled'));
+      if (signal.aborted) return onAbort();
+
+      signal.addEventListener('abort', onAbort);
+      promise
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener('abort', onAbort));
+    });
+  }
+
   return promise;
 };
 
