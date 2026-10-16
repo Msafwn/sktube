@@ -75,6 +75,17 @@ const Watch = () => {
     comments,
     (currentList, action) => {
       if (action.type === 'ADD_COMMENT') {
+        // Prevent duplicate if already in list by _id or matching pending temp content from same user
+        const authorId = action.comment.owner?._id || action.comment.owner;
+        const exists = currentList.some(
+          (c) =>
+            c._id?.toString() === action.comment._id?.toString() ||
+            (c.content?.trim() === action.comment.content?.trim() &&
+              (c.owner?._id || c.owner) === authorId)
+        );
+        if (exists) {
+          return currentList;
+        }
         return [action.comment, ...currentList];
       }
       if (action.type === 'TOGGLE_LIKE') {
@@ -339,21 +350,21 @@ const Watch = () => {
       const handleNewComment = (newComment) => {
         if (!newComment?._id) return;
         setComments((prev) => {
-          // 1. If already exists with matching _id, update it
+          // If already exists with matching _id, do not duplicate!
           if (prev.some((c) => c._id?.toString() === newComment._id?.toString())) {
-            return prev.map((c) => (c._id?.toString() === newComment._id?.toString() ? newComment : c));
+            return prev;
           }
-          // 2. If replacing a temporary optimistic comment/reply
-          const tempIdx = prev.findIndex(
-            (c) => c._id?.toString().startsWith('temp-') && c.content === newComment.content
+          // If replacing any matching temporary comment by content & author, replace it
+          const authorId = newComment.owner?._id || newComment.owner;
+          const filtered = prev.filter(
+            (c) =>
+              !(
+                c._id?.toString().startsWith('temp-') &&
+                c.content?.trim() === newComment.content?.trim() &&
+                (c.owner?._id || c.owner) === authorId
+              )
           );
-          if (tempIdx !== -1) {
-            const copy = [...prev];
-            copy[tempIdx] = newComment;
-            return copy;
-          }
-          // 3. Otherwise add new comment/reply to the list
-          return [newComment, ...prev];
+          return [newComment, ...filtered];
         });
       };
 
@@ -569,7 +580,7 @@ const Watch = () => {
       navigate('/login');
       return;
     }
-    if (!commentInput.trim() || !videoId) return;
+    if (!commentInput.trim() || !videoId || submittingComment) return;
 
     const content = commentInput.trim();
     setCommentInput('');
@@ -595,7 +606,15 @@ const Watch = () => {
       try {
         const res = await commentService.addComment(videoId, content);
         if (res?.data?._id) {
-          setComments((prev) => [res.data, ...prev.filter((c) => c._id !== tempComment._id)]);
+          setComments((prev) => {
+            // If socket already added this comment by _id, just remove the temp comment
+            if (prev.some((c) => c._id?.toString() === res.data._id?.toString())) {
+              return prev.filter((c) => c._id !== tempComment._id);
+            }
+            // Otherwise replace tempComment with the real server comment
+            const filtered = prev.filter((c) => c._id !== tempComment._id && c._id !== res.data._id);
+            return [res.data, ...filtered];
+          });
         }
       } catch (err) {
         console.error('Error adding comment:', err);
@@ -603,7 +622,7 @@ const Watch = () => {
         setSubmittingComment(false);
       }
     });
-  }, [commentInput, videoId, user, navigate, setOptimisticComments]);
+  }, [commentInput, videoId, user, navigate, submittingComment, setOptimisticComments]);
 
   // Reply State
   const [replyingToId, setReplyingToId] = useState(null);

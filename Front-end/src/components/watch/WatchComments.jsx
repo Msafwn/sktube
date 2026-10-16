@@ -32,12 +32,35 @@ const WatchComments = ({
   const throttledReplySubmit = useThrottleCallback(onReplySubmit, 1000);
   const throttledCommentLikeToggle = useThrottleCallback(onCommentLikeToggle, 600);
 
+  // Deduplicate comments by ID and collapse any temporary optimistic items matching confirmed comments
+  const uniqueComments = React.useMemo(() => {
+    if (!Array.isArray(comments)) return [];
+    const seenIds = new Set();
+    const confirmedKeys = new Set(
+      comments
+        .filter((c) => !c._id?.toString().startsWith('temp-'))
+        .map((c) => `${c.owner?._id || c.owner}-${c.content?.trim()}`)
+    );
+
+    return comments.filter((c) => {
+      if (!c?._id) return false;
+      // If this is a temporary optimistic item and the confirmed item already exists, remove temporary item
+      if (c._id.toString().startsWith('temp-')) {
+        const key = `${c.owner?._id || c.owner}-${c.content?.trim()}`;
+        if (confirmedKeys.has(key)) return false;
+      }
+      if (seenIds.has(c._id.toString())) return false;
+      seenIds.add(c._id.toString());
+      return true;
+    });
+  }, [comments]);
+
   return (
     <div className="flex flex-col gap-5 pt-4">
       {/* Comments Header */}
       <div className="flex items-center gap-3">
         <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
-          {comments.length} Comments
+          {uniqueComments.length} Comments
         </h3>
       </div>
 
@@ -79,19 +102,19 @@ const WatchComments = ({
 
       {/* Comments List */}
       <div className="flex flex-col gap-5 mt-2">
-        {comments.filter((c) => !c.parentComment).length === 0 ? (
+        {uniqueComments.filter((c) => !c.parentComment).length === 0 ? (
           <div className="text-center py-8 glass-panel rounded-2xl border border-white/5">
             <MessageSquare className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
             <p className="text-xs sm:text-sm text-neutral-400">No comments yet. Be the first to comment on this video!</p>
           </div>
         ) : (
-          comments
+          uniqueComments
             .filter((c) => !c.parentComment)
             .map((c) => {
               const isVideoOwner = user?._id && video?.owner?._id && (user._id.toString() === video.owner._id.toString() || user._id.toString() === video.owner.toString());
               const isCommentOwner = user?._id && (c.owner?._id === user._id || c.owner === user._id || c.owner?._id?.toString() === user._id.toString());
               const canDelete = isCommentOwner || isVideoOwner;
-              const replies = comments.filter((r) => {
+              const replies = uniqueComments.filter((r) => {
                 const pId = r.parentComment?._id || r.parentComment;
                 return pId && c._id && pId.toString() === c._id.toString();
               });
