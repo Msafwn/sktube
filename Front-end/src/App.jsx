@@ -6,9 +6,9 @@ import { ModalProvider } from './context/ModalContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import PageLoader from './components/PageLoader';
+import Home from './pages/Home';
 
-// Route-based Code Splitting: Pages load on-demand
-const Home = lazy(() => import('./pages/Home'));
+// Route-based Code Splitting: Secondary pages load on-demand
 const WatchHistory = lazy(() => import('./pages/WatchHistory'));
 const Subscriptions = lazy(() => import('./pages/Subscriptions'));
 const Explore = lazy(() => import('./pages/Explore'));

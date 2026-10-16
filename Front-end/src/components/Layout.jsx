@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
+import PageLoader from './PageLoader';
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -74,7 +75,9 @@ const Layout = () => {
             isSidebarCollapsed ? 'md:ml-20' : 'md:ml-60'
           }`}
         >
-          <Outlet />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 
