@@ -318,7 +318,7 @@ const logoutUser = asyncHandler(async (req, res) => {
                 }
             },
             {
-                new: true
+                returnDocument: 'after'
             }
         );
     }
@@ -497,7 +497,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
             }
         },
         {
-            new: true
+            returnDocument: 'after'
         }
     ).select("-password -refreshToken");
 
@@ -547,7 +547,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
             }
         },
         {
-            new: true
+            returnDocument: 'after'
         }
     ).select("-password -refreshToken");
 
@@ -599,7 +599,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
             }
         },
         {
-            new: true
+            returnDocument: 'after'
         }
     ).select("-password -refreshToken");
 

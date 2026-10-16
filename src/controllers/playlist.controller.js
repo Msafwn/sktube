@@ -235,7 +235,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     const updatedPlaylist = await Playlist.findByIdAndUpdate(
         playlistId,
         { $addToSet: { videos: new mongoose.Types.ObjectId(videoId) } },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     return res
@@ -274,7 +274,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     const updatedPlaylist = await Playlist.findByIdAndUpdate(
         playlistId,
         { $pull: { videos: new mongoose.Types.ObjectId(videoId) } },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     return res
@@ -359,7 +359,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
                 description: description.trim()
             }
         },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     return res

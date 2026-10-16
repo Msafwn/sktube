@@ -231,39 +231,36 @@ const Watch = () => {
         if (res?.data) {
           const vidData = res.data;
           setVideo(vidData);
+          setLoading(false); // Unblock video player immediately for instant playback
           setIsLiked(Boolean(vidData.isLiked));
           setLikesCount(typeof vidData.likesCount === 'number' ? vidData.likesCount : (vidData.views ? Math.floor(vidData.views / 10) : 0));
           setIsSubscribed(Boolean(vidData.owner?.isSubscribed));
           setSubscribersCount(vidData.owner?.subscribersCount || 0);
 
-          // Fetch Comments
-          try {
-            const commentRes = await commentService.getVideoComments(videoId, 1, 20, { signal: controller.signal });
-            setComments(commentRes?.data?.comments || (Array.isArray(commentRes?.data) ? commentRes.data : []));
-          } catch (e) {
-            if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-              console.error('Comments fetch error:', e);
+          // Fetch Comments & Recommendations concurrently in the background
+          Promise.allSettled([
+            commentService.getVideoComments(videoId, 1, 20, { signal: controller.signal }),
+            videoService.getAllVideos({ limit: 10 }, { signal: controller.signal })
+          ]).then(([commentRes, recRes]) => {
+            if (controller.signal.aborted) return;
+            if (commentRes.status === 'fulfilled') {
+              const cData = commentRes.value?.data;
+              setComments(cData?.comments || (Array.isArray(cData) ? cData : []));
             }
-          }
-
-          // Fetch Recommendations
-          try {
-            const allRes = await videoService.getAllVideos({ limit: 10 }, { signal: controller.signal });
-            const allList = allRes?.data?.videos || (Array.isArray(allRes?.data) ? allRes.data : []);
-            setRecommendedVideos(allList.filter((v) => v._id !== videoId));
-          } catch (e) {
-            if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-              console.error('Recommendations fetch error:', e);
+            if (recRes.status === 'fulfilled') {
+              const rData = recRes.value?.data;
+              const allList = rData?.videos || (Array.isArray(rData) ? rData : []);
+              setRecommendedVideos(allList.filter((v) => v._id !== videoId));
             }
-          }
+          });
         } else {
           setError("We couldn't find the video you requested. It might have been removed by the creator.");
+          setLoading(false);
         }
       } catch (err) {
         if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
           setError(err.response?.data?.message || err.message || 'Failed to load video.');
         }
-      } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
         }

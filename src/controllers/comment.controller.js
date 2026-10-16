@@ -289,7 +289,7 @@ const updateComment = asyncHandler(async (req, res) => {
     const updatedComment = await Comment.findByIdAndUpdate(
         commentId,
         { $set: { content: content.trim() } },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     // Flush cached comments for this video

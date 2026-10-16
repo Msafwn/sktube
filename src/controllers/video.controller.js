@@ -295,52 +295,54 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid Video ID format");
     }
 
-    // 3. User logged-in hone par Watch History save karein, unique viewer track karein aur views increment karein
-    if (req.user?._id) {
-        // Remove previous occurrence and place at position 0 (Newest watched video first)
-        await User.findByIdAndUpdate(req.user._id, {
-            $pull: { watchHistory: new mongoose.Types.ObjectId(videoId) }
-        });
-        await User.findByIdAndUpdate(req.user._id, {
-            $push: {
-                watchHistory: {
-                    $each: [new mongoose.Types.ObjectId(videoId)],
-                    $position: 0
+    // 3. User logged-in hone par Watch History save karein aur views increment karein (Non-blocking background execution taake video foran load ho)
+    (async () => {
+        try {
+            if (req.user?._id) {
+                await User.findByIdAndUpdate(req.user._id, {
+                    $pull: { watchHistory: new mongoose.Types.ObjectId(videoId) }
+                });
+                await User.findByIdAndUpdate(req.user._id, {
+                    $push: {
+                        watchHistory: {
+                            $each: [new mongoose.Types.ObjectId(videoId)],
+                            $position: 0
+                        }
+                    }
+                });
+
+                const alreadyViewed = await Video.exists({
+                    _id: new mongoose.Types.ObjectId(videoId),
+                    viewedBy: req.user._id
+                });
+
+                if (!alreadyViewed) {
+                    await Video.findByIdAndUpdate(videoId, {
+                        $addToSet: { viewedBy: req.user._id },
+                        $inc: { views: 1 }
+                    });
+                }
+            } else {
+                const guestViewKey = `viewed_${videoId}`;
+                if (!req.cookies?.[guestViewKey]) {
+                    try {
+                        res.cookie(guestViewKey, "1", { 
+                            maxAge: 1000 * 60 * 30, // 30 minutes throttle
+                            httpOnly: true, 
+                            sameSite: "lax" 
+                        });
+                    } catch (e) {
+                        // ignore cookie errors
+                    }
+                    await Video.findByIdAndUpdate(videoId, {
+                        $inc: { views: 1 }
+                    });
                 }
             }
-        });
-
-        // Check if this user has already been recorded as a viewer
-        const alreadyViewed = await Video.exists({
-            _id: new mongoose.Types.ObjectId(videoId),
-            viewedBy: req.user._id
-        });
-
-        if (!alreadyViewed) {
-            // First time this registered user watches the video
-            await Video.findByIdAndUpdate(videoId, {
-                $addToSet: { viewedBy: req.user._id },
-                $inc: { views: 1 }
-            });
+        } catch (trackErr) {
+            console.error("Background view/history tracking error:", trackErr.message);
         }
-    } else {
-        // Guest view increment: throttle using cookie so multiple re-renders/refreshes don't spam views
-        const guestViewKey = `viewed_${videoId}`;
-        if (!req.cookies?.[guestViewKey]) {
-            try {
-                res.cookie(guestViewKey, "1", { 
-                    maxAge: 1000 * 60 * 30, // 30 minutes throttle
-                    httpOnly: true, 
-                    sameSite: "lax" 
-                });
-            } catch (e) {
-                // ignore cookie errors
-            }
-            await Video.findByIdAndUpdate(videoId, {
-                $inc: { views: 1 }
-            });
-        }
-    }
+    })();
 
     // 4. Redis Cache Check for Base Video Metadata (Heavy joins avoid karne ke liye)
     const cacheKey = `cache:video:${videoId}`;
@@ -527,7 +529,7 @@ const updateVideo = asyncHandler(async (req, res) => {
                 thumbnail: updatedThumbnailUrl
             }
         },
-        { new: true }
+        { returnDocument: 'after' }
     ).populate("owner", "fullName username avatar");
 
     // Invalidate cached video lists and single video cache so explore/watch pages update immediately
@@ -641,7 +643,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     const updatedVideo = await Video.findByIdAndUpdate(
         videoId,
         { $set: { isPublished: newStatus } },
-        { new: true }
+        { returnDocument: 'after' }
     ).select("isPublished").lean();
 
     // Invalidate cached video lists and single video cache so explore/watch pages update immediately

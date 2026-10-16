@@ -267,7 +267,7 @@ const updateTweet = asyncHandler(async (req, res) => {
     const updatedTweet = await Tweet.findByIdAndUpdate(
         tweetId,
         { $set: { content: content.trim() } },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     // 7. Updated tweet return kiya

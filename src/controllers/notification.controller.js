@@ -85,7 +85,7 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: notificationId, recipient: req.user._id },
     { isRead: true },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!notification) {
