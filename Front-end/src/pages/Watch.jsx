@@ -20,6 +20,14 @@ import subscriptionService from '../services/subscriptionService';
 import playlistService from '../services/playlistService';
 import { useThrottleCallback } from '../hooks/useThrottle';
 
+const getDislikedVideos = () => {
+  try {
+    return JSON.parse(localStorage.getItem('sktube_disliked_videos') || '[]');
+  } catch {
+    return [];
+  }
+};
+
 const Watch = () => {
   const { user } = useAuth();
   const { socket, joinStream, leaveStream, joinWatchParty, leaveWatchParty, syncPartyAction } = useSocket();
@@ -32,6 +40,18 @@ const Watch = () => {
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Video Dislike state persisted in localStorage
+  const [isDisliked, setIsDisliked] = useState(() => {
+    if (!videoId) return false;
+    return getDislikedVideos().includes(videoId);
+  });
+
+  useEffect(() => {
+    if (videoId) {
+      setIsDisliked(getDislikedVideos().includes(videoId));
+    }
+  }, [videoId]);
 
   // Recommendations / Up Next
   const [recommendedVideos, setRecommendedVideos] = useState([]);
@@ -95,7 +115,23 @@ const Watch = () => {
             return {
               ...c,
               isLiked: nextLiked,
+              isDisliked: nextLiked ? false : c.isDisliked,
               likesCount: nextLiked ? (c.likesCount || 0) + 1 : Math.max(0, (c.likesCount || 1) - 1)
+            };
+          }
+          return c;
+        });
+      }
+      if (action.type === 'TOGGLE_DISLIKE') {
+        return currentList.map((c) => {
+          if (c._id && action.commentId && c._id.toString() === action.commentId.toString()) {
+            const nextDisliked = !c.isDisliked;
+            const wasLiked = Boolean(c.isLiked);
+            return {
+              ...c,
+              isDisliked: nextDisliked,
+              isLiked: nextDisliked ? false : c.isLiked,
+              likesCount: nextDisliked && wasLiked ? Math.max(0, (c.likesCount || 1) - 1) : c.likesCount
             };
           }
           return c;
@@ -406,6 +442,18 @@ const Watch = () => {
       return;
     }
 
+    // Clear video dislike if active
+    if (isDisliked) {
+      setIsDisliked(false);
+      try {
+        const stored = getDislikedVideos();
+        const updated = stored.filter((id) => id !== video._id);
+        localStorage.setItem('sktube_disliked_videos', JSON.stringify(updated));
+      } catch (err) {
+        console.error('Error updating dislike storage on like:', err);
+      }
+    }
+
     startLikeTransition(async () => {
       setOptimisticLike({}); // Optimistically flip like state & counter immediately
       try {
@@ -420,7 +468,53 @@ const Watch = () => {
         console.error('Error toggling like:', err);
       }
     });
-  }, [video?._id, user, navigate, likeState.likesCount, setOptimisticLike]);
+  }, [video?._id, user, navigate, isDisliked, likeState.likesCount, setOptimisticLike]);
+
+  // Toggle Video Dislike with localStorage persistence & mutual exclusivity with like
+  const handleDislikeToggle = useCallback(() => {
+    if (!video?._id) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    const nextDisliked = !isDisliked;
+    setIsDisliked(nextDisliked);
+
+    try {
+      const stored = getDislikedVideos();
+      let updated;
+      if (nextDisliked) {
+        updated = Array.from(new Set([...stored, video._id]));
+      } else {
+        updated = stored.filter((id) => id !== video._id);
+      }
+      localStorage.setItem('sktube_disliked_videos', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Error saving dislike to storage:', err);
+    }
+
+    // If disliking while currently liked, un-like the video
+    if (nextDisliked && optimisticLike.isLiked) {
+      startLikeTransition(async () => {
+        setOptimisticLike({
+          isLiked: false,
+          likesCount: Math.max(0, optimisticLike.likesCount - 1)
+        });
+        try {
+          const res = await likeService.toggleVideoLike(video._id);
+          if (res?.data) {
+            setLikeState({
+              isLiked: Boolean(res.data.isLiked),
+              likesCount: typeof res.data.likesCount === 'number' ? res.data.likesCount : Math.max(0, likeState.likesCount - 1)
+            });
+          }
+        } catch (err) {
+          console.error('Error unliking video on dislike:', err);
+        }
+      });
+    }
+  }, [video?._id, user, navigate, isDisliked, optimisticLike.isLiked, optimisticLike.likesCount, likeState.likesCount, setOptimisticLike]);
 
   // Toggle Channel Subscription with React 19 useOptimistic
   const handleSubscribeToggle = useCallback(() => {
@@ -645,9 +739,11 @@ const Watch = () => {
           setComments((prev) =>
             prev.map((c) => {
               if (c._id && commentId && c._id.toString() === commentId.toString()) {
+                const nextLiked = res.data.isLiked !== undefined ? Boolean(res.data.isLiked) : !c.isLiked;
                 return {
                   ...c,
-                  isLiked: res.data.isLiked !== undefined ? Boolean(res.data.isLiked) : c.isLiked,
+                  isLiked: nextLiked,
+                  isDisliked: nextLiked ? false : c.isDisliked,
                   likesCount: typeof res.data.likesCount === 'number' ? res.data.likesCount : c.likesCount
                 };
               }
@@ -660,6 +756,46 @@ const Watch = () => {
       }
     });
   }, [user, navigate, setOptimisticComments]);
+
+  // Toggle Comment Dislike with mutual exclusivity
+  const handleCommentDislikeToggle = useCallback((commentId) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!commentId) return;
+
+    const targetComment = comments.find((c) => c._id?.toString() === commentId.toString());
+    const wasLiked = Boolean(targetComment?.isLiked);
+
+    startCommentTransition(async () => {
+      setOptimisticComments({ type: 'TOGGLE_DISLIKE', commentId });
+
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c._id && commentId && c._id.toString() === commentId.toString()) {
+            const nextDisliked = !c.isDisliked;
+            return {
+              ...c,
+              isDisliked: nextDisliked,
+              isLiked: nextDisliked ? false : c.isLiked,
+              likesCount: nextDisliked && wasLiked ? Math.max(0, (c.likesCount || 1) - 1) : c.likesCount
+            };
+          }
+          return c;
+        })
+      );
+
+      // If comment was previously liked and we are disliking it, revoke the like on backend
+      if (wasLiked) {
+        try {
+          await likeService.toggleCommentLike(commentId);
+        } catch (err) {
+          console.error('Error unliking comment on dislike:', err);
+        }
+      }
+    });
+  }, [user, navigate, comments, setOptimisticComments]);
 
   // Submit Reply to a comment
   const handleReplySubmit = useCallback(async (parentCommentId) => {
@@ -787,6 +923,8 @@ const Watch = () => {
             isLiked={optimisticLike.isLiked}
             likesCount={optimisticLike.likesCount}
             onLikeToggle={handleLikeToggle}
+            isDisliked={isDisliked}
+            onDislikeToggle={handleDislikeToggle}
             copied={copied}
             onShare={handleShare}
             activePartyId={activePartyId}
@@ -816,6 +954,7 @@ const Watch = () => {
             video={video}
             formatDate={formatDate}
             onCommentLikeToggle={handleCommentLikeToggle}
+            onCommentDislikeToggle={handleCommentDislikeToggle}
             replyingToId={replyingToId}
             onSetReplyingToId={setReplyingToId}
             replyInput={replyInput}

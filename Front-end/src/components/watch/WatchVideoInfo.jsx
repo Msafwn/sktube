@@ -22,6 +22,8 @@ const WatchVideoInfo = ({
   isLiked,
   likesCount,
   onLikeToggle,
+  isDisliked,
+  onDislikeToggle,
   copied,
   onShare,
   activePartyId,
@@ -30,8 +32,9 @@ const WatchVideoInfo = ({
   onToggleWatchLater,
   onOpenPlaylistModal
 }) => {
-  // Throttle rapid like & subscribe clicks (Max 1 action per 800ms)
+  // Throttle rapid like, dislike & subscribe clicks (Max 1 action per 800ms)
   const throttledLikeToggle = useThrottleCallback(onLikeToggle, 800);
+  const throttledDislikeToggle = useThrottleCallback(onDislikeToggle, 800);
   const throttledSubscribeToggle = useThrottleCallback(onSubscribeToggle, 800);
   return (
     <div className="flex flex-col gap-3">
@@ -115,10 +118,13 @@ const WatchVideoInfo = ({
             </button>
             <div className="w-[1px] h-5 bg-white/10 shrink-0" />
             <button 
-              className="px-3 py-2 text-neutral-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer shrink-0"
-              title="I dislike this"
+              onClick={throttledDislikeToggle}
+              className={`px-3 py-2 transition-all cursor-pointer shrink-0 ${
+                isDisliked ? 'text-[#FF0055] bg-[#FF0055]/10' : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+              title={isDisliked ? "Remove dislike" : "I dislike this"}
             >
-              <ThumbsDown className="w-4 h-4 shrink-0" />
+              <ThumbsDown className={`w-4 h-4 shrink-0 ${isDisliked ? 'fill-[#FF0055]' : ''}`} />
             </button>
           </div>
 

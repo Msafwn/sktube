@@ -18,6 +18,7 @@ const WatchComments = ({
   video,
   formatDate,
   onCommentLikeToggle,
+  onCommentDislikeToggle,
   replyingToId,
   onSetReplyingToId,
   replyInput,
@@ -31,6 +32,7 @@ const WatchComments = ({
   const throttledCommentSubmit = useThrottleCallback(onCommentSubmit, 1000);
   const throttledReplySubmit = useThrottleCallback(onReplySubmit, 1000);
   const throttledCommentLikeToggle = useThrottleCallback(onCommentLikeToggle, 600);
+  const throttledCommentDislikeToggle = useThrottleCallback(onCommentDislikeToggle, 600);
 
   // Deduplicate comments by ID and collapse any temporary optimistic items matching confirmed comments
   const uniqueComments = React.useMemo(() => {
@@ -157,8 +159,14 @@ const WatchComments = ({
                         </button>
 
                         {/* Dislike Button */}
-                        <button className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer">
-                          <ThumbsDown className="w-3.5 h-3.5" />
+                        <button 
+                          onClick={() => throttledCommentDislikeToggle(c._id)}
+                          className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                            c.isDisliked ? 'text-[#FF0055] font-bold' : 'hover:text-white'
+                          }`}
+                          title={c.isDisliked ? "Remove dislike" : "Dislike comment"}
+                        >
+                          <ThumbsDown className={`w-3.5 h-3.5 ${c.isDisliked ? 'fill-[#FF0055]' : ''}`} />
                         </button>
 
                         {/* Reply Button */}
@@ -263,8 +271,14 @@ const WatchComments = ({
                                       <ThumbsUp className={`w-3 h-3 ${reply.isLiked ? 'fill-[#FF0055]' : ''}`} />
                                       <span>{(reply.likesCount || 0) > 0 ? reply.likesCount : ''}</span>
                                     </button>
-                                    <button className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer">
-                                      <ThumbsDown className="w-3 h-3" />
+                                    <button 
+                                      onClick={() => throttledCommentDislikeToggle(reply._id)}
+                                      className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                                        reply.isDisliked ? 'text-[#FF0055] font-bold' : 'hover:text-white'
+                                      }`}
+                                      title={reply.isDisliked ? "Remove dislike" : "Dislike reply"}
+                                    >
+                                      <ThumbsDown className={`w-3 h-3 ${reply.isDisliked ? 'fill-[#FF0055]' : ''}`} />
                                     </button>
                                     {canDeleteReply && (
                                       <button 
