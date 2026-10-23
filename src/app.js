@@ -101,13 +101,10 @@ import tweetRouter from "./routes/tweet.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import healthcheckRouter from "./routes/healthcheck.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
-import { rootLandingPage, healthcheck } from "./controllers/healthcheck.controller.js";
+import { rootLandingPage } from "./controllers/healthcheck.controller.js";
 
-// Root landing page (Interactive HTML Status Dashboard)
+// Root landing page (Professional API Status & Documentation Portal)
 app.get("/", rootLandingPage);
-
-// Cloud Healthcheck aliases (Supports Render's default /healthz & /health)
-app.get(["/healthz", "/health"], healthcheck);
 
 // Routes declaration
 app.use("/api/v1/healthcheck", healthcheckRouter);

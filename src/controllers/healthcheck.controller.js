@@ -4,9 +4,8 @@ import { asyncHandler } from "../utils/AsyncHandle.js";
 
 /**
  * =========================================================================
- * Controller 1: Health Check (JSON API)
- * Kaam: Detailed health status, uptime, database & services status
- * Method: GET | Route: /api/v1/healthcheck & /healthz
+ * Controller 1: Health Check (Single Standard JSON API Endpoint)
+ * Method: GET | Route: /api/v1/healthcheck
  * =========================================================================
  */
 const healthcheck = asyncHandler(async (req, res) => {
@@ -33,17 +32,17 @@ const healthcheck = asyncHandler(async (req, res) => {
 
 /**
  * =========================================================================
- * Controller 2: Root Landing Page (HTML Dashboard)
- * Kaam: Renders a sleek, responsive status dashboard when visiting backend URL
+ * Controller 2: Professional Root Landing Page (HTML Status & API Portal)
  * Method: GET | Route: /
  * =========================================================================
  */
 const rootLandingPage = (req, res) => {
     const uptimeSeconds = Math.floor(process.uptime());
-    const hours = Math.floor(uptimeSeconds / 3600);
+    const days = Math.floor(uptimeSeconds / (3600 * 24));
+    const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
     const minutes = Math.floor((uptimeSeconds % 3600) / 60);
     const seconds = uptimeSeconds % 60;
-    const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
+    const uptimeFormatted = `${days > 0 ? `${days}d ` : ''}${hours}h ${minutes}m ${seconds}s`;
     const isDbConnected = mongoose.connection.readyState === 1;
 
     const html = `<!DOCTYPE html>
@@ -51,104 +50,122 @@ const rootLandingPage = (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SKTUBE API | Enterprise 4K Video Streaming Backend</title>
+  <title>SKTUBE API &bull; Enterprise 4K Video Streaming Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --primary: #FF0055;
+      --primary-hover: #e0004c;
+      --primary-glow: rgba(255, 0, 85, 0.35);
+      --bg-dark: #09090b;
+      --card-bg: rgba(18, 18, 26, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --success: #10b981;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #09090b;
-      color: #f4f4f5;
+      background: var(--bg-dark);
+      color: var(--text-main);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
       position: relative;
       overflow-x: hidden;
+      line-height: 1.5;
     }
-    /* Subtle background ambient glow */
-    .bg-glow {
-      position: absolute;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(255, 0, 85, 0.12) 0%, rgba(255, 0, 85, 0) 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    /* Subtle background grid & ambient light */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
       pointer-events: none;
       z-index: 0;
     }
-    .container {
-      width: 100%;
-      max-width: 760px;
-      background: rgba(18, 18, 24, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 24px;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 40px;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 0, 85, 0.08);
-      position: relative;
-      z-index: 1;
+    .bg-glow-1 {
+      position: fixed;
+      width: 650px;
+      height: 650px;
+      background: radial-gradient(circle, rgba(255, 0, 85, 0.12) 0%, transparent 70%);
+      top: -150px;
+      right: -100px;
+      pointer-events: none;
+      z-index: 0;
     }
-    .header {
+    .bg-glow-2 {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+      bottom: -100px;
+      left: -100px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .navbar {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 24px;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-      gap: 16px;
+      position: relative;
+      z-index: 10;
     }
-    .logo-container {
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #FF0055 0%, #FF2E7E 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px var(--primary-glow);
+    }
+    .brand-icon svg { width: 20px; height: 20px; fill: #ffffff; margin-left: 2px; }
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .brand-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      margin-left: 6px;
+    }
+    .nav-actions {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-    .logo-badge {
-      width: 44px;
-      height: 44px;
-      background: linear-gradient(135deg, #FF0055 0%, #FF2E7E 100%);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 8px 20px rgba(255, 0, 85, 0.35);
-    }
-    .logo-badge svg {
-      width: 22px;
-      height: 22px;
-      fill: #ffffff;
-      margin-left: 2px;
-    }
-    .logo-text h1 {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .logo-text p {
-      font-size: 12px;
-      color: #71717a;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .status-pill {
+    .status-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(16, 185, 129, 0.1);
+      background: rgba(16, 185, 129, 0.08);
       border: 1px solid rgba(16, 185, 129, 0.25);
       color: #34d399;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       padding: 6px 14px;
       border-radius: 9999px;
@@ -163,198 +180,440 @@ const rootLandingPage = (req, res) => {
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 0.35; transform: scale(0.85); }
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 28px;
+    .main {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px 20px 80px 20px;
+      position: relative;
+      z-index: 10;
+      flex: 1;
     }
-    .card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 16px;
-      padding: 16px 20px;
-      transition: all 0.2s ease;
+    .hero {
+      text-align: center;
+      padding: 40px 0 50px 0;
+      max-width: 780px;
+      margin: 0 auto;
     }
-    .card:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.12);
-      transform: translateY(-2px);
-    }
-    .card-label {
-      font-size: 11px;
-      color: #a1a1aa;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.75px;
-      margin-bottom: 6px;
-    }
-    .card-value {
-      font-size: 16px;
-      font-weight: 700;
-      color: #ffffff;
-      display: flex;
+    .hero-pill {
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-    }
-    .card-value.online { color: #34d399; }
-    .card-value.highlight { color: #FF2E7E; }
-    .endpoints-title {
-      font-size: 13px;
-      color: #a1a1aa;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-    }
-    .endpoints-list {
-      display: flex;
-      flex-direction: column;
       gap: 8px;
-      margin-bottom: 32px;
-    }
-    .endpoint-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12.5px;
-      color: #e4e4e7;
-    }
-    .endpoint-method {
+      font-size: 12px;
       font-weight: 700;
-      color: #38bdf8;
-      font-size: 11px;
-      background: rgba(56, 189, 248, 0.1);
-      padding: 3px 8px;
-      border-radius: 6px;
-      margin-right: 10px;
+      color: #FF2E7E;
+      background: rgba(255, 0, 85, 0.08);
+      border: 1px solid rgba(255, 0, 85, 0.2);
+      padding: 5px 14px;
+      border-radius: 9999px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
-    .actions {
+    .hero h1 {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #d4d4d8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 32px; letter-spacing: -1px; }
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .hero-buttons {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: center;
+      gap: 14px;
       flex-wrap: wrap;
     }
     .btn {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
       gap: 8px;
-      padding: 12px 22px;
-      border-radius: 12px;
-      font-size: 13px;
+      padding: 12px 24px;
+      border-radius: 14px;
+      font-size: 14px;
       font-weight: 700;
       text-decoration: none;
       transition: all 0.2s ease;
       cursor: pointer;
     }
     .btn-primary {
-      background: #FF0055;
+      background: var(--primary);
       color: #ffffff;
-      box-shadow: 0 4px 15px rgba(255, 0, 85, 0.35);
+      box-shadow: 0 4px 20px var(--primary-glow);
+      border: none;
     }
     .btn-primary:hover {
-      background: #e0004c;
-      transform: translateY(-1px);
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px var(--primary-glow);
     }
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #e4e4e7;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
     }
     .btn-secondary:hover {
       background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
       color: #ffffff;
+      transform: translateY(-2px);
+    }
+    /* Telemetry Stats Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 22px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: all 0.25s ease;
+    }
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+    .card-icon {
+      color: var(--primary);
+    }
+    .card-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-val.online { color: #34d399; }
+    .card-sub {
+      font-size: 12px;
+      color: #71717a;
+      margin-top: 4px;
+    }
+    /* Code Quick Test Panel */
+    .code-panel {
+      background: #0d0d12;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 36px;
+    }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .code-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .copy-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #e4e4e7;
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+    .token-method { color: #38bdf8; font-weight: 700; }
+    .token-url { color: #f472b6; }
+    .token-header { color: #a78bfa; }
+    /* Endpoints Directory */
+    .directory-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 28px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .directory-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    .directory-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+    .endpoint-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .endpoint-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px 18px;
+      transition: all 0.2s ease;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .endpoint-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .endpoint-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e4e4e7;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .method-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 9px;
+      border-radius: 6px;
+    }
+    .method-get { background: rgba(56, 189, 248, 0.12); color: #38bdf8; }
+    .method-post { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+    .method-patch { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
+    .method-delete { background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
+    .endpoint-desc {
+      font-size: 12.5px;
+      color: #a1a1aa;
     }
     .footer {
-      margin-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 30px 20px;
       text-align: center;
-      font-size: 11.5px;
-      color: #52525b;
-      font-weight: 500;
+      font-size: 12.5px;
+      color: #71717a;
+      position: relative;
+      z-index: 10;
     }
+    .footer a { color: #e4e4e7; text-decoration: none; font-weight: 600; }
+    .footer a:hover { color: var(--primary); }
   </style>
 </head>
 <body>
-  <div class="bg-glow"></div>
-  <div class="container">
-    <div class="header">
-      <div class="logo-container">
-        <div class="logo-badge">
-          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-        </div>
-        <div class="logo-text">
-          <h1>SKTUBE API</h1>
-          <p>Enterprise 4K Streaming Engine</p>
-        </div>
+  <div class="bg-grid"></div>
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Header Navigation -->
+  <header class="navbar">
+    <a href="/" class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
       </div>
-      <div class="status-pill">
+      <div>
+        <span class="brand-name">SKTUBE</span>
+        <span class="brand-tag">v1.0 API</span>
+      </div>
+    </a>
+
+    <div class="nav-actions">
+      <div class="status-badge">
         <div class="pulse-dot"></div>
-        <span>Operational</span>
+        <span>All Systems Operational</span>
       </div>
+      <a href="/api/v1/healthcheck" class="btn btn-secondary" style="padding: 8px 16px; font-size: 12.5px;" target="_blank">
+        Healthcheck JSON
+      </a>
     </div>
+  </header>
 
-    <div class="grid">
-      <div class="card">
-        <div class="card-label">Server Status</div>
-        <div class="card-value online">● Healthy 200 OK</div>
+  <!-- Main Hero Content -->
+  <main class="main">
+    <section class="hero">
+      <div class="hero-pill">
+        <span>⚡ Production Grade Streaming Engine</span>
       </div>
+      <h1>Enterprise 4K Video Streaming Backend</h1>
+      <p>High-performance, stateless RESTful & WebSocket API engine engineered with Express 5, MongoDB Atlas, Redis Caching, and Cloudinary Adaptive Bitrate Media Delivery.</p>
+      
+      <div class="hero-buttons">
+        <a href="/api/v1/healthcheck" class="btn btn-primary" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          Test Healthcheck API
+        </a>
+        <a href="https://github.com/Msafwn/sktube" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub Repository
+        </a>
+      </div>
+    </section>
+
+    <!-- Live Telemetry Dashboard -->
+    <section class="telemetry-grid">
       <div class="card">
-        <div class="card-label">Database</div>
-        <div class="card-value ${isDbConnected ? 'online' : 'highlight'}">
-          ${isDbConnected ? '● MongoDB Atlas Connected' : '● Reconnecting'}
+        <div class="card-header">
+          <span class="card-title">Database Core</span>
+          <span class="card-icon">🗄️</span>
+        </div>
+        <div class="card-val ${isDbConnected ? 'online' : ''}">
+          ${isDbConnected ? '● MongoDB Atlas' : 'Connecting...'}
+        </div>
+        <div class="card-sub">Multi-region distributed cluster</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Process Uptime</span>
+          <span class="card-icon">⏱️</span>
+        </div>
+        <div class="card-val">${uptimeFormatted}</div>
+        <div class="card-sub">Zero-downtime stateless container</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Media Pipeline</span>
+          <span class="card-icon">🎬</span>
+        </div>
+        <div class="card-val" style="color: #FF2E7E;">Cloudinary 4K</div>
+        <div class="card-sub">Adaptive WebP/MP4 transcoding</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Realtime Engine</span>
+          <span class="card-icon">⚡</span>
+        </div>
+        <div class="card-val online">Socket.IO 4.8</div>
+        <div class="card-sub">Watch Party & live sync enabled</div>
+      </div>
+    </section>
+
+    <!-- cURL Live Test Console -->
+    <section class="code-panel">
+      <div class="code-header">
+        <span class="code-title">Terminal Quick Probe</span>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('curl -X GET &quot;' + window.location.origin + '/api/v1/healthcheck&quot; -H &quot;Accept: application/json&quot;'); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy cURL', 2000);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          Copy cURL
+        </button>
+      </div>
+      <pre><code><span class="token-method">curl</span> -X GET <span class="token-url">"https://sktube-backend.onrender.com/api/v1/healthcheck"</span> \
+  -H <span class="token-header">"Accept: application/json"</span></code></pre>
+    </section>
+
+    <!-- Endpoints Directory -->
+    <section class="directory-panel">
+      <h2 class="directory-title">Primary REST API Endpoints</h2>
+      <p class="directory-sub">Secure JSON endpoints protected via JWT cookies, rate limiting, and CSRF tokens.</p>
+
+      <div class="endpoint-grid">
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-get">GET</span>
+            <span>/api/v1/healthcheck</span>
+          </div>
+          <span class="endpoint-desc">System heartbeat, uptime, and database telemetry</span>
+        </div>
+
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-get">GET</span>
+            <span>/api/v1/videos</span>
+          </div>
+          <span class="endpoint-desc">Fetch filtered, paginated video feed & search results</span>
+        </div>
+
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-post">POST</span>
+            <span>/api/v1/users/login</span>
+          </div>
+          <span class="endpoint-desc">Account authentication & cross-domain JWT issuance</span>
+        </div>
+
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-get">GET</span>
+            <span>/api/v1/videos/:videoId</span>
+          </div>
+          <span class="endpoint-desc">Stream resolution details, owner metadata, and viewer stats</span>
+        </div>
+
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-post">POST</span>
+            <span>/api/v1/likes/toggle/v/:videoId</span>
+          </div>
+          <span class="endpoint-desc">Atomic video like / dislike state toggle</span>
+        </div>
+
+        <div class="endpoint-row">
+          <div class="endpoint-path">
+            <span class="method-badge method-get">GET</span>
+            <span>/api/v1/comments/:videoId</span>
+          </div>
+          <span class="endpoint-desc">Paginated comments stream & nested replies tree</span>
         </div>
       </div>
-      <div class="card">
-        <div class="card-label">Server Uptime</div>
-        <div class="card-value">${uptimeFormatted}</div>
-      </div>
-      <div class="card">
-        <div class="card-label">CDN & Storage</div>
-        <div class="card-value highlight">Cloudinary 4K</div>
-      </div>
-    </div>
+    </section>
+  </main>
 
-    <div class="endpoints-title">Core API Surface</div>
-    <div class="endpoints-list">
-      <div class="endpoint-item">
-        <div><span class="endpoint-method">GET</span>/api/v1/healthcheck</div>
-        <span style="color:#71717a; font-size:11px;">System Health Probe</span>
-      </div>
-      <div class="endpoint-item">
-        <div><span class="endpoint-method">GET</span>/api/v1/videos</div>
-        <span style="color:#71717a; font-size:11px;">Feed & Video Stream Query</span>
-      </div>
-      <div class="endpoint-item">
-        <div><span class="endpoint-method">POST</span>/api/v1/users/login</div>
-        <span style="color:#71717a; font-size:11px;">JWT Secure Authentication</span>
-      </div>
-      <div class="endpoint-item">
-        <div><span class="endpoint-method">WS</span>/socket.io</div>
-        <span style="color:#71717a; font-size:11px;">Real-Time Watch Party & Sync</span>
-      </div>
-    </div>
-
-    <div class="actions">
-      <a href="/api/v1/healthcheck" class="btn btn-primary" target="_blank">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        View JSON Healthcheck
-      </a>
-      <a href="/healthz" class="btn btn-secondary">
-        Cloud Probe (/healthz)
-      </a>
-    </div>
-  </div>
-  <div class="footer">
-    SKTUBE Video Streaming Engine &bull; Built with Express, MongoDB Atlas, Redis & Cloudinary
-  </div>
+  <!-- Footer -->
+  <footer class="footer">
+    <p>SKTUBE Backend &bull; Developed by <a href="https://github.com/Msafwn" target="_blank" rel="noopener noreferrer">SAFWAN</a> &bull; Production Ready on Render & Vercel</p>
+  </footer>
 </body>
 </html>`;
 
@@ -363,4 +622,5 @@ const rootLandingPage = (req, res) => {
 };
 
 export { healthcheck, rootLandingPage };
+
 

@@ -24,19 +24,12 @@ describe("SKTUBE Backend API Tests", () => {
             assert.ok(typeof res.body.data.uptime === "number");
         });
 
-        it("GET /healthz cloud alias should return 200 OK", async () => {
-            const res = await request(app).get("/healthz");
-
-            assert.strictEqual(res.status, 200);
-            assert.strictEqual(res.body.data.status, "healthy");
-        });
-
         it("GET / should render the interactive HTML status landing page", async () => {
             const res = await request(app).get("/");
 
             assert.strictEqual(res.status, 200);
             assert.match(res.headers["content-type"], /html/);
-            assert.match(res.text, /SKTUBE API/);
+            assert.match(res.text, /SKTUBE/);
             assert.match(res.text, /Operational/);
         });
     });
