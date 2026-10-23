@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
+import path from "path";
 
 import { ApiError } from "./utils/ApiError.js";
 import { generalLimiter } from "./Middlewares/rateLimiter.middleware.js";
@@ -101,10 +102,11 @@ import tweetRouter from "./routes/tweet.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import healthcheckRouter from "./routes/healthcheck.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
-import { rootLandingPage } from "./controllers/healthcheck.controller.js";
 
-// Root landing page (Professional API Status & Documentation Portal)
-app.get("/", rootLandingPage);
+// Root landing page (Serves static enterprise HTML Status & API Portal)
+app.get("/", (req, res) => {
+    res.sendFile(path.resolve("Public", "index.html"));
+});
 
 // Routes declaration
 app.use("/api/v1/healthcheck", healthcheckRouter);
