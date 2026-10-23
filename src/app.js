@@ -11,14 +11,14 @@ import { securitySanitizer } from "./Middlewares/sanitize.middleware.js";
 
 const app = express();
 
-// Enable trust proxy for NGINX reverse proxy & accurate client IP in rate limiters
-app.set("trust proxy", 1);
+// Enable trust proxy for reverse proxies & CDNs (Cloudflare, CloudFront, Render, Back4App)
+app.set("trust proxy", true);
 
-// Force HTTPS redirection in production environments (Strict 301 Permanent Redirect)
+// Force HTTPS redirection in production environments if forwarded protocol is HTTP
 app.use((req, res, next) => {
     if (process.env.NODE_ENV === "production") {
-        const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
-        if (!isSecure) {
+        const forwardedProto = req.headers["x-forwarded-proto"];
+        if (forwardedProto && forwardedProto.split(",")[0].trim() === "http") {
             return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
         }
     }
