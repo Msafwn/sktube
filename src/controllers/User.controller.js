@@ -270,7 +270,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const baseCookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         path: "/"
     };
 
@@ -326,7 +326,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     const options = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         path: "/"
     };
 
@@ -380,7 +380,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         const baseCookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             path: "/"
         };
 
@@ -891,7 +891,7 @@ const googleLogin = asyncHandler(async (req, res) => {
     const baseCookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         path: "/"
     };
 

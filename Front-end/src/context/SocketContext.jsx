@@ -37,8 +37,18 @@ export const SocketProvider = ({ children }) => {
 
   // Initialize Socket Connection
   useEffect(() => {
-    // Connect to server (proxied by Vite/Nginx with secure cookies)
-    const socket = io({
+    // Resolve socket server URL (supports Vercel frontend talking to remote Render backend)
+    let socketServerUrl = import.meta.env.VITE_SOCKET_URL;
+    if (!socketServerUrl && import.meta.env.VITE_API_BASE_URL) {
+      try {
+        const parsed = new URL(import.meta.env.VITE_API_BASE_URL, window.location.href);
+        socketServerUrl = parsed.origin;
+      } catch (err) {
+        socketServerUrl = undefined;
+      }
+    }
+
+    const socket = io(socketServerUrl || undefined, {
       withCredentials: true,
       auth: {
         userId: user?._id || undefined
