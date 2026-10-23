@@ -26,22 +26,34 @@ export const initSocket = (httpServer) => {
     pingInterval: 25000
   });
 
-  // Attach Redis Pub/Sub Adapter for cluster & multi-server event broadcasting
-  try {
-    const redisUri = process.env.REDIS_URI || "redis://127.0.0.1:6379";
-    const pubClient = new Redis(redisUri, {
-      maxRetriesPerRequest: 2,
-      retryStrategy: (times) => Math.min(times * 150, 3000)
-    });
-    const subClient = pubClient.duplicate();
+  // Attach Redis Pub/Sub Adapter if a valid remote Redis instance is configured
+  const isProduction = process.env.NODE_ENV === "production";
+  const rawRedisUri = process.env.REDIS_URI;
+  const hasValidRedis = Boolean(
+    rawRedisUri &&
+    process.env.NODE_ENV !== "test" &&
+    !(isProduction && (rawRedisUri.includes("127.0.0.1") || rawRedisUri.includes("localhost")))
+  );
 
-    pubClient.on("error", (err) => console.warn("⚠️ [Socket.IO Redis Pub]:", err.message));
-    subClient.on("error", (err) => console.warn("⚠️ [Socket.IO Redis Sub]:", err.message));
+  if (hasValidRedis) {
+    try {
+      const pubClient = new Redis(rawRedisUri, {
+        maxRetriesPerRequest: null,
+        enableOfflineQueue: false,
+        retryStrategy: (times) => Math.min(times * 200, 3000)
+      });
+      const subClient = pubClient.duplicate();
 
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log("⚡ [Socket.IO]: Redis Pub/Sub Adapter attached successfully.");
-  } catch (adapterErr) {
-    console.warn("⚠️ [Socket.IO]: Redis adapter setup warning (using in-memory fallback):", adapterErr.message);
+      pubClient.on("error", (err) => console.warn("⚠️ [Socket.IO Redis Pub]:", err.message));
+      subClient.on("error", (err) => console.warn("⚠️ [Socket.IO Redis Sub]:", err.message));
+
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log("⚡ [Socket.IO]: Redis Pub/Sub Adapter attached successfully.");
+    } catch (adapterErr) {
+      console.warn("⚠️ [Socket.IO]: Redis adapter setup warning (using in-memory fallback):", adapterErr.message);
+    }
+  } else {
+    console.log("⚡ [Socket.IO]: Running with in-memory adapter (No external Redis required).");
   }
 
   // Socket Authentication Middleware

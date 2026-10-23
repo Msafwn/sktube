@@ -1,14 +1,14 @@
 import { rateLimit } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
-import { redis } from "../utils/redis.js";
+import { redis, isRedisConfigured } from "../utils/redis.js";
 import { ApiError } from "../utils/ApiError.js";
 
 /**
  * Helper: Create Redis Store instance for Rate Limiting
  */
 const createStore = (prefix) => {
-    if (process.env.NODE_ENV === "test") {
-        return undefined; // Use in-memory store during automated tests
+    if (!isRedisConfigured) {
+        return undefined; // Use reliable in-memory store when Redis is not configured
     }
     return new RedisStore({
         sendCommand: (...args) => redis.call(...args),

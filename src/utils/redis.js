@@ -8,34 +8,45 @@ import Redis from "ioredis";
  * =========================================================================
  */
 
-const redisUri = process.env.REDIS_URI || "redis://127.0.0.1:6379";
+const rawRedisUri = process.env.REDIS_URI;
 const isTest = process.env.NODE_ENV === "test";
+const isProduction = process.env.NODE_ENV === "production";
 
-export const redis = isTest
-    ? {
-        call: async () => null,
-        get: async () => null,
-        set: async () => "OK",
-        del: async () => 1,
-        disconnect: () => {},
-        status: "close",
-        on: () => {},
-        scanStream: () => ({ on: () => {} }),
-        pipeline: () => ({ del: () => {}, exec: async () => [] })
-    }
-    : new Redis(redisUri, {
-        maxRetriesPerRequest: 2,
+// Only connect to Redis if explicitly configured with an accessible URI
+// In production/cloud containers, ignore 127.0.0.1 or localhost if no local redis daemon is present
+export const isRedisConfigured = Boolean(
+    rawRedisUri &&
+    !isTest &&
+    !(isProduction && (rawRedisUri.includes("127.0.0.1") || rawRedisUri.includes("localhost")))
+);
+
+const mockRedis = {
+    call: async () => null,
+    get: async () => null,
+    set: async () => "OK",
+    del: async () => 1,
+    disconnect: () => {},
+    status: "close",
+    on: () => {},
+    scanStream: () => ({ on: () => {} }),
+    pipeline: () => ({ del: () => {}, exec: async () => [] })
+};
+
+export const redis = isRedisConfigured
+    ? new Redis(rawRedisUri, {
+        maxRetriesPerRequest: null,
+        enableOfflineQueue: false,
         enableReadyCheck: true,
         retryStrategy(times) {
-            // Exponential backoff capped at 3 seconds
-            const delay = Math.min(times * 150, 3000);
+            const delay = Math.min(times * 200, 3000);
             return delay;
         }
-    });
+    })
+    : mockRedis;
 
-let isRedisConnected = false;
+export let isRedisConnected = false;
 
-if (!isTest) {
+if (isRedisConfigured) {
     redis.on("connect", () => {
         isRedisConnected = true;
         console.log("⚡ [Redis]: Connected to Redis Server successfully.");
@@ -54,6 +65,8 @@ if (!isTest) {
     redis.on("close", () => {
         isRedisConnected = false;
     });
+} else {
+    console.log("ℹ️ [Redis]: Running in in-memory mode (falling back to database seamlessly).");
 }
 
 /**
