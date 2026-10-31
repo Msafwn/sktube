@@ -18,7 +18,10 @@ const streamViewers = new Map();
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN || "*",
+      origin: (origin, callback) => {
+        // Allow all origins with credentials dynamically (Vercel domains, preview URLs, localhost)
+        callback(null, true);
+      },
       credentials: true,
       methods: ["GET", "POST"]
     },

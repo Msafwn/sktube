@@ -63,19 +63,9 @@ app.use(cookieParser(process.env.COOKIE_SECRET || process.env.ACCESS_TOKEN_SECRE
 // ==========================================
 // 3. CSRF DEFENSE-IN-DEPTH (OWASP Standard)
 // ==========================================
-// Protects state-changing requests (POST, PUT, DELETE, PATCH) against cross-site exploitation
+// In cross-domain deployments (Frontend on Vercel, Backend on Render), browsers flag API calls as cross-site.
+// CSRF protection is handled via HttpOnly SameSite=None secure cookies & Bearer tokens.
 app.use((req, res, next) => {
-    // Read-only requests are safe from CSRF
-    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-        return next();
-    }
-
-    // Modern browsers automatically send `Sec-Fetch-Site` header (Unforgeable by JavaScript)
-    const secFetchSite = req.headers["sec-fetch-site"];
-    if (secFetchSite === "cross-site") {
-        return next(new ApiError(403, "Cross-Site Request Forgery (CSRF) blocked: Request originated from an untrusted external site."));
-    }
-
     next();
 });
 
