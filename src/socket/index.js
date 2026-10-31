@@ -39,7 +39,7 @@ export const initSocket = (httpServer) => {
     try {
       const pubClient = new Redis(rawRedisUri, {
         maxRetriesPerRequest: null,
-        enableOfflineQueue: false,
+        enableOfflineQueue: true,
         retryStrategy: (times) => Math.min(times * 200, 3000)
       });
       const subClient = pubClient.duplicate();
