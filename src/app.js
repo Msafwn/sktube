@@ -85,10 +85,6 @@ app.use((req, res, next) => {
 // Unified Express 5 Sanitizer: NoSQL Injection + XSS + Parameter Pollution (HPP)
 app.use(securitySanitizer);
 
-// Apply Speed Throttling & General Rate Limiter across all API endpoints
-app.use("/api/v1", speedThrottler, generalLimiter);
-
-
 // ==========================================
 // 4. ROUTES IMPORT & DECLARATION
 // ==========================================
@@ -108,8 +104,11 @@ app.get("/", (req, res) => {
     res.sendFile(path.resolve("Public", "index.html"));
 });
 
-// Routes declaration
+// Health check endpoint (Bypasses rate limiting so cloud monitoring never gets 429)
 app.use("/api/v1/healthcheck", healthcheckRouter);
+
+// Apply Speed Throttling & General Rate Limiter across all API business endpoints
+app.use("/api/v1", speedThrottler, generalLimiter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/videos", videoRouter);
 app.use("/api/v1/likes", likeRouter);
