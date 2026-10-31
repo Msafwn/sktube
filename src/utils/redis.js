@@ -35,7 +35,7 @@ const mockRedis = {
 export const redis = isRedisConfigured
     ? new Redis(rawRedisUri, {
         maxRetriesPerRequest: null,
-        enableOfflineQueue: false,
+        enableOfflineQueue: true,
         enableReadyCheck: true,
         retryStrategy(times) {
             const delay = Math.min(times * 200, 3000);
