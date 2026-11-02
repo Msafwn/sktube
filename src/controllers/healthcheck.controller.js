@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/AsyncHandle.js";
+import { isRedisConnected, isRedisConfigured } from "../utils/redis.js";
 
 /**
  * =========================================================================
@@ -21,7 +22,11 @@ const healthcheck = asyncHandler(async (req, res) => {
                     status: "healthy",
                     uptime: process.uptime(),
                     timestamp: new Date().toISOString(),
-                    database: isDbConnected ? "connected" : "disconnected"
+                    database: isDbConnected ? "connected" : "disconnected",
+                    redis: {
+                        configured: isRedisConfigured,
+                        connected: isRedisConnected
+                    }
                 },
                 "Server is up and running"
             )
