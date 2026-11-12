@@ -11,6 +11,9 @@ export const UploadMediaDropzone = ({
   handleRemoveThumbnail,
   loading,
   uploadProgress,
+  compressing,
+  compressProgress,
+  compressStatus,
   fieldErrors = {}
 }) => (
   <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
@@ -120,10 +123,15 @@ export const UploadMediaDropzone = ({
     <div className="glass-panel p-5 2xl:p-6 rounded-2xl border border-white/10 flex flex-col gap-3 shadow-xl">
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || compressing}
         className="btn-primary w-full py-3 2xl:py-3.5 text-sm font-bold gap-2 shadow-xl shadow-[#FF0055]/30 disabled:opacity-50 cursor-pointer"
       >
-        {loading ? (
+        {compressing ? (
+          <>
+            <Loader2 className="w-4.5 h-4.5 animate-spin text-[#FF2E7E]" />
+            <span>{compressStatus || `Optimizing Bitrate (${compressProgress}%)...`}</span>
+          </>
+        ) : loading ? (
           <>
             <Loader2 className="w-4.5 h-4.5 animate-spin" />
             <span>

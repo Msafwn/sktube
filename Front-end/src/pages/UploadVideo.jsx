@@ -10,6 +10,7 @@ import {
   UploadMobileForm
 } from '../components/upload';
 import videoService from '../services/videoService';
+import { compressVideoClientSide } from '../utils/videoCompressor';
 
 // ==========================================
 // 1. INITIAL STATE & REDUCER DEFINITION
@@ -24,12 +25,22 @@ const initialUploadState = {
   thumbnailPreview: null,
   loading: false,
   uploadProgress: 0,
+  compressing: false,
+  compressProgress: 0,
+  compressStatus: '',
   message: null,
   fieldErrors: {}
 };
 
 function uploadReducer(state, action) {
   switch (action.type) {
+    case 'SET_COMPRESSING':
+      return {
+        ...state,
+        compressing: action.compressing,
+        compressProgress: action.progress ?? state.compressProgress,
+        compressStatus: action.status ?? state.compressStatus
+      };
     case 'SET_FIELD':
       return {
         ...state,
@@ -120,6 +131,9 @@ function uploadReducer(state, action) {
         ...state,
         loading: false,
         uploadProgress: 100,
+        compressing: false,
+        compressProgress: 0,
+        compressStatus: '',
         message: {
           type: 'success',
           text: action.text || 'Video published successfully!'
@@ -137,6 +151,9 @@ function uploadReducer(state, action) {
         ...state,
         loading: false,
         uploadProgress: 0,
+        compressing: false,
+        compressProgress: 0,
+        compressStatus: '',
         message: {
           type: 'error',
           text: action.text
@@ -167,6 +184,9 @@ const UploadVideo = () => {
     thumbnailPreview,
     loading,
     uploadProgress,
+    compressing,
+    compressProgress,
+    compressStatus,
     message,
     fieldErrors
   } = state;
@@ -208,19 +228,19 @@ const UploadVideo = () => {
         });
         return;
       }
-      // Check 100MB Cloudinary limit
-      if (file.size > 100 * 1024 * 1024) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      // Allow videos up to 2GB! If > 95MB, will auto-compress seamlessly
+      if (file.size > 2048 * 1024 * 1024) {
+        const sizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(1);
         dispatch({
           type: 'SET_FIELD_ERROR',
           field: 'videoFile',
-          error: `File is ${sizeMB}MB. Max allowed is 100MB.`
+          error: `File is ${sizeGB}GB. Max allowed is 2GB.`
         });
         dispatch({
           type: 'SET_MESSAGE',
           message: {
             type: 'error',
-            text: `Video file (${sizeMB}MB) exceeds Cloudinary's 100MB limit. Please select a video under 100MB.`
+            text: `Video file (${sizeGB}GB) exceeds 2GB maximum limit. Please select a video under 2GB.`
           }
         });
         return;
@@ -281,6 +301,40 @@ const UploadVideo = () => {
     }
 
     try {
+      let finalVideoFile = videoFile;
+
+      // If video file exceeds 95MB, run non-blocking client-side optimizer
+      if (videoFile.size > 95 * 1024 * 1024) {
+        dispatch({
+          type: 'SET_COMPRESSING',
+          compressing: true,
+          progress: 5,
+          status: '⚡ Optimizing video bitrate & preserving 1080p frames...'
+        });
+
+        try {
+          finalVideoFile = await compressVideoClientSide(videoFile, (progress, status) => {
+            dispatch({
+              type: 'SET_COMPRESSING',
+              compressing: true,
+              progress,
+              status
+            });
+          });
+        } catch (compressionError) {
+          console.warn('Non-blocking compression skipped or unsupported:', compressionError);
+          // Fall back to original file if browser codecs are unavailable
+          finalVideoFile = videoFile;
+        } finally {
+          dispatch({
+            type: 'SET_COMPRESSING',
+            compressing: false,
+            progress: 100,
+            status: ''
+          });
+        }
+      }
+
       dispatch({ type: 'START_UPLOAD' });
 
       const formData = new FormData();
@@ -288,7 +342,7 @@ const UploadVideo = () => {
       formData.append('description', description.trim());
       formData.append('category', category);
       formData.append('isPublished', visibility === 'public');
-      formData.append('videoFile', videoFile);
+      formData.append('videoFile', finalVideoFile);
       formData.append('thumbnail', thumbnail);
 
       const res = await videoService.publishVideo(formData, (progressEvent) => {
@@ -406,6 +460,9 @@ const UploadVideo = () => {
             handleRemoveThumbnail={handleRemoveThumbnail}
             loading={loading}
             uploadProgress={uploadProgress}
+            compressing={compressing}
+            compressProgress={compressProgress}
+            compressStatus={compressStatus}
             fieldErrors={fieldErrors}
           />
         </form>
